@@ -1,0 +1,9 @@
+config/config.local.php
+.env
+*.log
+test.php
+config/test-*.php
+
+# Runtime uploads should be copied/backed up separately from code deploys.
+uploads/*
+!uploads/.gitkeep

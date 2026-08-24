@@ -1,0 +1,9 @@
+Options -MultiViews
+DirectoryIndex index.php
+
+RewriteEngine On
+
+# Allow URLs like /chatweb/pages/chat to load /chatweb/pages/chat.php.
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.+?)/?$ $1.php [L,QSA]
