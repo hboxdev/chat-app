@@ -1206,6 +1206,44 @@ body{
     margin-top:6px;
 }
 
+.image-attachment{
+    position:relative;
+    max-width:320px;
+    margin-top:6px;
+}
+
+.image-attachment .message-media{
+    margin-top:0;
+}
+
+.image-download-button{
+    position:absolute;
+    right:8px;
+    bottom:8px;
+    width:34px;
+    height:34px;
+    border:1px solid rgba(255,255,255,.65);
+    border-radius:50%;
+    background:rgba(15,23,42,.72);
+    color:#FFFFFF;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+    box-shadow:0 10px 24px rgba(15,23,42,.24);
+    opacity:0;
+    transition:opacity var(--transition),transform var(--transition);
+}
+
+.image-attachment:hover .image-download-button,
+.image-download-button:focus{
+    opacity:1;
+}
+
+.image-download-button:hover{
+    transform:translateY(-1px);
+}
+
 .message-video,
 .message-audio{
     max-width:320px;
@@ -6122,9 +6160,14 @@ function buildAttachmentHtml(msg){
 
     if(msg.message_type === "image"){
         return `
-            <button class="image-view-button" type="button" data-open-image="${safeAttachment}" data-image-name="${fileName}" title="Open image" aria-label="Open image">
-                <img class="message-media" src="${safeAttachment}" alt="${fileName}" loading="lazy">
-            </button>
+            <div class="image-attachment">
+                <button class="image-view-button" type="button" data-open-image="${safeAttachment}" data-image-name="${fileName}" title="Open image" aria-label="Open image">
+                    <img class="message-media" src="${safeAttachment}" alt="${fileName}" loading="lazy">
+                </button>
+                <a class="image-download-button" href="${safeAttachment}" download="${fileName}" title="Download image" aria-label="Download image">
+                    <i class="fa-solid fa-download"></i>
+                </a>
+            </div>
         `;
     }
 
@@ -7165,7 +7208,7 @@ function loadMessages(){
                 const pinLabel = Number(msg.is_pinned || 0) === 1 ? "Unpin" : "Pin";
                 const starLabel = Number(msg.is_starred || 0) === 1 ? "Unstar" : "Star";
                 const downloadHtml = msg.attachment && Number(msg.is_view_once || 0) !== 1
-                    ? `<a href="../${escapeHtml(msg.attachment)}" download="${escapeHtml(msg.message || "attachment")}" data-download-message="${msg.id}">Download</a>`
+                    ? `<button type="button" data-download-url="../${escapeHtml(msg.attachment)}" data-download-name="${escapeHtml(msg.message || "attachment")}">Download</button>`
                     : "";
                 const metaHtml = buildMessageMeta(msg, isMine);
                 const reactionsHtml = buildReactionsHtml(msg.reactions);
@@ -7874,6 +7917,19 @@ function exportCurrentConversation(){
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+function triggerFileDownload(url, name){
+    if(!url){
+        return;
+    }
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name || "attachment";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function openToolModal(title, tabsHtml, bodyHtml, showSearch = true){
@@ -8759,9 +8815,18 @@ document.getElementById("messages").addEventListener("click", function(event){
     const starButton = event.target.closest("[data-star-message]");
     const pinButton = event.target.closest("[data-pin-message]");
     const infoButton = event.target.closest("[data-info-message]");
+    const downloadButton = event.target.closest("[data-download-url]");
 
     if(imageButton){
         openImageLightbox(imageButton.dataset.openImage, imageButton.dataset.imageName || "Image");
+        return;
+    }
+
+    if(downloadButton){
+        triggerFileDownload(downloadButton.dataset.downloadUrl, downloadButton.dataset.downloadName || "attachment");
+        document.querySelectorAll(".message-menu").forEach(function(item){
+            item.classList.remove("open");
+        });
         return;
     }
 
