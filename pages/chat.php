@@ -602,6 +602,11 @@ body{
     color:#1f2937;
     cursor:pointer;
     font-size:17px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+    padding:0;
     box-shadow:0 10px 20px rgba(15,23,42,.06);
     transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease;
 }
@@ -4372,6 +4377,12 @@ body{
     body.mobile-chat-open .mobile-chat-back{
         display:inline-flex;
         flex:0 0 38px;
+        width:38px;
+        height:38px;
+        align-items:center;
+        justify-content:center;
+        padding:0;
+        line-height:1;
     }
 
     body.mobile-chat-open .app-sidebar{
