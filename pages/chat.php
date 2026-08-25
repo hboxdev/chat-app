@@ -3958,7 +3958,7 @@ body{
     .contact-panel.open{
         position:fixed;
         inset:0;
-        width:100vw;
+        width:100%;
         max-width:none;
         z-index:12000;
         border-left:0;
@@ -4596,7 +4596,7 @@ body{
 
     .contact-panel,
     .contact-panel.open{
-        width:100vw;
+        width:100%;
         max-width:none;
     }
 }
@@ -4677,6 +4677,71 @@ body{
 }
 
 /* Final responsive safety pass for phones, tablets, and wide screens */
+html,
+body{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+    -webkit-text-size-adjust:100%;
+}
+
+img,
+video,
+canvas,
+svg{
+    max-width:100%;
+}
+
+button,
+input,
+select,
+textarea{
+    font:inherit;
+    max-width:100%;
+}
+
+.page-shell,
+.chat-page,
+.chat-container,
+.chat-area,
+.chat-sidebar,
+.message-bubble,
+.message-with-reactions{
+    min-width:0;
+}
+
+.chat-page{
+    width:100%;
+    max-width:100%;
+}
+
+.chat-topbar,
+.chat-container{
+    width:min(100%,1360px);
+    max-width:calc(100vw - clamp(20px,4vw,64px));
+}
+
+.chat-topbar{
+    flex-wrap:wrap;
+}
+
+.topbar-actions,
+.chat-actions,
+.message-menu,
+.tool-box,
+.call-box,
+.forward-box{
+    max-width:100%;
+}
+
+.message-bubble,
+.reply-preview,
+.message-text,
+.file-attachment,
+.voice-player{
+    overflow-wrap:anywhere;
+}
+
 @supports (height: 100dvh){
     .page-shell{
         height:100dvh;
@@ -4777,7 +4842,7 @@ body{
 @media(min-width:1440px){
     .chat-container,
     .chat-topbar{
-        width:min(1360px,calc(100vw - 80px));
+        width:min(1500px,calc(100vw - 80px));
     }
 
     .chat-container{
@@ -4812,6 +4877,8 @@ body{
         height:calc(64px + env(safe-area-inset-bottom));
         min-height:calc(64px + env(safe-area-inset-bottom));
         padding-bottom:calc(8px + env(safe-area-inset-bottom));
+        padding-left:max(10px,env(safe-area-inset-left));
+        padding-right:max(10px,env(safe-area-inset-right));
     }
 
     .chat-container{
@@ -4841,6 +4908,8 @@ body{
     .composer{
         flex:0 0 auto;
         padding-bottom:calc(10px + env(safe-area-inset-bottom));
+        padding-left:max(10px,env(safe-area-inset-left));
+        padding-right:max(10px,env(safe-area-inset-right));
     }
 
     .chat-header{
@@ -4870,6 +4939,21 @@ body{
 
     .image-lightbox-stage{
         height:88dvh;
+    }
+
+    .chat-topbar,
+    .chat-container{
+        max-width:100%;
+    }
+
+    .message-menu{
+        max-width:calc(100vw - 28px);
+    }
+
+    .tool-box,
+    .forward-box,
+    .call-box{
+        width:calc(100vw - 20px);
     }
 }
 

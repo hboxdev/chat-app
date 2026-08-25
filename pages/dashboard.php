@@ -619,6 +619,123 @@ body{
         grid-template-columns:1fr;
     }
 }
+
+/* Responsive safety pass */
+html,
+body{
+    width:100%;
+    max-width:100%;
+    overflow-x:hidden;
+    -webkit-text-size-adjust:100%;
+}
+
+img,
+svg{
+    max-width:100%;
+}
+
+button,
+input,
+select,
+textarea{
+    font:inherit;
+    max-width:100%;
+}
+
+.layout{
+    width:100%;
+    min-width:0;
+}
+
+.main{
+    width:100%;
+    max-width:1500px;
+    margin:0 auto;
+    padding-left:clamp(16px,2.5vw,34px);
+    padding-right:clamp(16px,2.5vw,34px);
+}
+
+.topbar,
+.profile-pill,
+.welcome-actions{
+    min-width:0;
+    flex-wrap:wrap;
+}
+
+.topbar h2{
+    font-size:clamp(24px,3vw,32px);
+}
+
+.welcome-card h3{
+    font-size:clamp(24px,3.8vw,42px);
+    line-height:1.12;
+}
+
+.stat-grid,
+.quick-grid,
+.activity-grid{
+    grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));
+}
+
+.nav a,
+.profile-pill,
+.card,
+.activity-card{
+    min-width:0;
+}
+
+.nav a span,
+.profile-pill strong,
+.profile-pill span,
+.card,
+.activity-card{
+    overflow-wrap:anywhere;
+}
+
+@media(max-width:900px){
+    .layout,
+    .layout.sidebar-collapsed{
+        display:block;
+    }
+
+    .sidebar,
+    .layout.sidebar-collapsed .sidebar{
+        width:100%;
+        min-height:auto;
+        flex-basis:auto;
+        border-right:0;
+        border-bottom:1px solid #dbe3ee;
+        position:relative;
+    }
+
+    .layout.sidebar-collapsed .brand-copy,
+    .layout.sidebar-collapsed .nav a span,
+    .layout.sidebar-collapsed .sidebar-toggle span{
+        display:block;
+    }
+
+    .layout.sidebar-collapsed .nav a{
+        width:auto;
+        justify-content:flex-start;
+        padding:12px 14px;
+    }
+}
+
+@media(max-width:520px){
+    .main{
+        padding:16px 12px calc(18px + env(safe-area-inset-bottom));
+    }
+
+    .topbar-actions,
+    .profile-pill{
+        width:100%;
+    }
+
+    .power-btn{
+        width:46px;
+        height:46px;
+    }
+}
 </style>
 </head>
 
@@ -761,13 +878,17 @@ body{
     const toggle = document.getElementById("sidebar-toggle");
 
     function sync(){
+        if(window.matchMedia("(max-width: 900px)").matches){
+            root.classList.remove("sidebar-collapsed");
+        }
+
         const collapsed = root.classList.contains("sidebar-collapsed");
         toggle.setAttribute("aria-label", collapsed ? "Open sidebar" : "Close sidebar");
         toggle.setAttribute("title", collapsed ? "Open sidebar" : "Close sidebar");
         toggle.querySelector("span").textContent = collapsed ? "Open sidebar" : "Collapse sidebar";
     }
 
-    if(localStorage.getItem("chatwebSidebarCollapsed") === "1"){
+    if(localStorage.getItem("chatwebSidebarCollapsed") === "1" && !window.matchMedia("(max-width: 900px)").matches){
         root.classList.add("sidebar-collapsed");
     }
 
@@ -784,6 +905,8 @@ body{
             localStorage.setItem("chatwebSidebarCollapsed", "1");
         });
     });
+
+    window.addEventListener("resize", sync);
 })();
 </script>
 <script src="../assets/js/notifications.js"></script>

@@ -65,16 +65,23 @@ exit();
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html,body{width:100%;max-width:100%;overflow-x:hidden}
+        .auth-wrap{min-height:100dvh;display:grid;place-items:center;padding:clamp(16px,4vw,40px)}
+        .auth-card{width:min(420px,100%)}
+        input,button{min-height:44px}
+    </style>
 </head>
 
 <body class="bg-light">
 
-<div class="container mt-5">
+<div class="container auth-wrap">
     <div class="row justify-content-center">
 
-        <div class="col-md-4">
+        <div class="col-12 auth-card">
 
             <div class="card shadow">
                 <div class="card-body">

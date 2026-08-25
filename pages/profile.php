@@ -505,6 +505,7 @@ $sessions = mysqli_query($conn, "SELECT id, browser, ip_address, device, locatio
 @media(max-width:900px){.shell{display:block}.sidebar{width:100%;border-right:0;border-bottom:1px solid var(--border)}.nav{grid-template-columns:repeat(3,1fr)}.topbar{align-items:flex-start;flex-direction:column}.form-grid,.photo-zone,.social-row{grid-template-columns:1fr}.main{padding:18px}}
 @media(max-width:620px){.nav,.mini-stats,.stat-grid,.media-grid{grid-template-columns:1fr}.info-row,.session-row{display:grid}.actions{justify-content:stretch}.btn,.primary-btn{width:100%}}
 .sidebar-toggle{width:100%;min-height:42px;border:1px solid var(--border);border-radius:12px;background:#fff;color:#273449;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;box-shadow:0 12px 28px rgba(15,23,42,.06);font-weight:800;font-size:14px;transition:.2s}.sidebar-toggle:hover{color:#2563eb;background:#eff6ff;transform:translateY(-1px)}.shell,.sidebar,.brand,.nav a{transition:.22s ease}.shell.sidebar-collapsed .sidebar{width:84px;flex-basis:84px;padding:22px 11px;align-items:center;gap:28px}.shell.sidebar-collapsed .brand{width:100%;justify-content:center;padding:0;margin-bottom:22px}.shell.sidebar-collapsed .brand-icon{width:44px;height:44px;border-radius:14px}.shell.sidebar-collapsed .brand-copy,.shell.sidebar-collapsed .nav a span,.shell.sidebar-collapsed .sidebar-toggle span{display:none}.shell.sidebar-collapsed .nav{width:100%;gap:14px}.shell.sidebar-collapsed .nav a{width:54px;min-height:44px;justify-content:center;padding:0;border-radius:14px}.shell.sidebar-collapsed .nav a.active{background:rgba(56,112,255,.14);box-shadow:inset 0 0 0 1px rgba(56,112,255,.22)}.shell.sidebar-collapsed .nav a.logout{margin-top:12px}.shell.sidebar-collapsed .sidebar-toggle{width:44px;min-height:44px;margin-top:10px;padding:0;border-radius:14px}.shell.sidebar-collapsed .sidebar-toggle i{transform:rotate(180deg)}
+html,body{width:100%;max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%}img,video,canvas,svg{max-width:100%}button,input,select,textarea{font:inherit;max-width:100%}.shell{width:100%;min-width:0}.main{width:100%;max-width:1500px;margin:0 auto;padding-left:clamp(16px,2.5vw,34px);padding-right:clamp(16px,2.5vw,34px)}.topbar,.topbar-actions,.panel-head,.actions,.info-row,.session-row{min-width:0;flex-wrap:wrap}.topbar h2{font-size:clamp(24px,3vw,32px)}.profile-layout{grid-template-columns:minmax(280px,360px) minmax(0,1fr)}.profile-card,.panel,.media-item,.stat-card,.info-row,.session-row{min-width:0}.panel h3{font-size:clamp(18px,2vw,22px)}.profile-card h3,.media-meta strong,.info-row strong,.session-row strong,.info-row span,.session-row small{overflow-wrap:anywhere}.stat-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}.media-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}.modal{padding:clamp(10px,3vw,24px);align-items:center}.modal-box{width:min(720px,calc(100vw - 20px));max-height:calc(100dvh - 20px);overflow:auto}.modal-body img,.modal-body video{max-height:calc(100dvh - 150px)}@media(max-width:900px){.shell,.shell.sidebar-collapsed{display:block}.sidebar,.shell.sidebar-collapsed .sidebar{width:100%;flex-basis:auto;border-right:0;border-bottom:1px solid var(--border)}.shell.sidebar-collapsed .brand-copy,.shell.sidebar-collapsed .nav a span,.shell.sidebar-collapsed .sidebar-toggle span{display:block}.shell.sidebar-collapsed .nav a{width:auto;justify-content:flex-start;padding:12px 14px}.nav{grid-template-columns:repeat(auto-fit,minmax(135px,1fr))}.profile-layout{grid-template-columns:1fr}.profile-card{position:relative;top:0}.topbar{align-items:flex-start;flex-direction:column}}@media(max-width:620px){.main{padding:16px 12px calc(18px + env(safe-area-inset-bottom))}.panel{padding:16px}.profile-nav,.mini-stats,.form-grid,.photo-zone,.range-row,.social-row{grid-template-columns:1fr}.actions .btn,.actions .primary-btn{width:100%}.info-row,.session-row{display:grid}.topbar-actions,.profile-pill{width:100%}}
 </style>
 </head>
 <body>
@@ -711,13 +712,17 @@ const sidebarToggle = document.getElementById("sidebar-toggle");
 
 (function(){
     function syncSidebar(){
+        if(window.matchMedia("(max-width: 900px)").matches){
+            sidebarRoot.classList.remove("sidebar-collapsed");
+        }
+
         const collapsed = sidebarRoot.classList.contains("sidebar-collapsed");
         sidebarToggle.setAttribute("aria-label", collapsed ? "Open sidebar" : "Close sidebar");
         sidebarToggle.setAttribute("title", collapsed ? "Open sidebar" : "Close sidebar");
         sidebarToggle.querySelector("span").textContent = collapsed ? "Open sidebar" : "Collapse sidebar";
     }
 
-    if(localStorage.getItem("chatwebSidebarCollapsed") === "1"){
+    if(localStorage.getItem("chatwebSidebarCollapsed") === "1" && !window.matchMedia("(max-width: 900px)").matches){
         sidebarRoot.classList.add("sidebar-collapsed");
     }
 
@@ -734,6 +739,8 @@ const sidebarToggle = document.getElementById("sidebar-toggle");
             localStorage.setItem("chatwebSidebarCollapsed", "1");
         });
     });
+
+    window.addEventListener("resize", syncSidebar);
 })();
 
 const ajaxUrl = "profile.php";
