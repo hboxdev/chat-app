@@ -4649,7 +4649,11 @@ body{
         padding:8px;
     }
 
-    .chat-actions .icon-btn:not(#search-toggle):not(#contact-toggle){
+    .chat-actions .icon-btn:not(#search-toggle):not(#contact-toggle):not(.call-action){
+        display:none;
+    }
+
+    #search-toggle{
         display:none;
     }
 
@@ -5517,8 +5521,19 @@ const emojis = [
 const callConfig = {
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" }
-    ]
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:openrelay.metered.ca:80" },
+        {
+            urls: [
+                "turn:openrelay.metered.ca:80",
+                "turn:openrelay.metered.ca:443",
+                "turn:openrelay.metered.ca:443?transport=tcp"
+            ],
+            username: "openrelayproject",
+            credential: "openrelayproject"
+        }
+    ],
+    iceCandidatePoolSize: 4
 };
 let activeCall = {
     id: 0,
@@ -5682,10 +5697,6 @@ function ensureCallReady(){
 function createPeer(){
     const peer = new RTCPeerConnection(callConfig);
 
-    try {
-        peer.addTransceiver("audio", { direction: "sendrecv" });
-    } catch (error) {}
-
     peer.onicecandidate = function(event){
         if(!event.candidate){
             return;
@@ -5734,6 +5745,9 @@ function attachRemoteStream(stream){
     remoteAudio.muted = false;
     remoteAudio.volume = 1;
     remoteAudio.setAttribute("playsinline", "");
+    remoteVideo.muted = false;
+    remoteVideo.volume = 1;
+    remoteVideo.setAttribute("playsinline", "");
 
     if(remoteVideo.srcObject !== stream){
         remoteVideo.srcObject = stream;
@@ -5750,13 +5764,17 @@ function attachRemoteStream(stream){
 
 function playRemoteAudio(){
     const remoteAudio = document.getElementById("remote-audio");
+    const remoteVideo = document.getElementById("remote-video");
     const soundButton = document.getElementById("call-sound-btn");
 
     if(remoteAudio && remoteAudio.play){
         remoteAudio.muted = false;
         remoteAudio.volume = 1;
         remoteAudio.setAttribute("playsinline", "");
-        return remoteAudio.play().then(() => {
+        const audioPromise = remoteAudio.play();
+        const videoPromise = remoteVideo && remoteVideo.srcObject ? remoteVideo.play().catch(() => {}) : Promise.resolve();
+
+        return Promise.all([audioPromise, videoPromise]).then(() => {
             callAudioUnlocked = true;
             if(soundButton){
                 soundButton.hidden = true;
@@ -5796,6 +5814,8 @@ function unlockCallAudio(){
     }
 
     if(remoteVideo && activeCall.type === "video"){
+        remoteVideo.muted = false;
+        remoteVideo.volume = 1;
         remoteVideo.play().catch(() => {});
     }
 }
@@ -5850,17 +5870,6 @@ function attachLocalTracksToPeer(stream){
 
         if(existingSender){
             return;
-        }
-
-        if(track.kind === "audio"){
-            const audioSender = activeCall.peer.getSenders().find(function(sender){
-                return sender.track === null;
-            });
-
-            if(audioSender && audioSender.replaceTrack){
-                audioSender.replaceTrack(track);
-                return;
-            }
         }
 
         activeCall.peer.addTrack(track, stream);
