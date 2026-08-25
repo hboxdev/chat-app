@@ -1231,13 +1231,8 @@ body{
     justify-content:center;
     text-decoration:none;
     box-shadow:0 10px 24px rgba(15,23,42,.24);
-    opacity:0;
-    transition:opacity var(--transition),transform var(--transition);
-}
-
-.image-attachment:hover .image-download-button,
-.image-download-button:focus{
     opacity:1;
+    transition:opacity var(--transition),transform var(--transition);
 }
 
 .image-download-button:hover{
@@ -6158,7 +6153,7 @@ function buildAttachmentHtml(msg){
         `;
     }
 
-    if(msg.message_type === "image"){
+    if(isImageAttachment(msg)){
         return `
             <div class="image-attachment">
                 <button class="image-view-button" type="button" data-open-image="${safeAttachment}" data-image-name="${fileName}" title="Open image" aria-label="Open image">
@@ -6199,6 +6194,13 @@ function buildAttachmentHtml(msg){
             <span>${fileName}</span>
         </a>
     `;
+}
+
+function isImageAttachment(msg){
+    const type = String(msg.message_type || "").toLowerCase();
+    const attachment = String(msg.attachment || msg.message || "").toLowerCase().split("?")[0];
+
+    return type === "image" || /\.(jpe?g|png|gif|webp|bmp|avif|svg)$/i.test(attachment);
 }
 
 function contactAvatarHtml(name, image){
