@@ -5442,6 +5442,7 @@ let activeCall = {
     upgradePrompted: false,
     upgradeRequested: false
 };
+let callAudioUnlocked = false;
 
 const pageShell = document.querySelector(".page-shell");
 const sidebarToggle = document.getElementById("sidebar-toggle");
@@ -5500,6 +5501,7 @@ function closeCallModal(){
     document.getElementById("remote-audio").srcObject = null;
     document.getElementById("local-video").srcObject = null;
     document.getElementById("call-sound-btn").hidden = true;
+    callAudioUnlocked = false;
 }
 
 function callSignal(action, payload = {}){
@@ -5585,6 +5587,10 @@ function ensureCallReady(){
 function createPeer(){
     const peer = new RTCPeerConnection(callConfig);
 
+    try {
+        peer.addTransceiver("audio", { direction: "sendrecv" });
+    } catch (error) {}
+
     peer.onicecandidate = function(event){
         if(!event.candidate){
             return;
@@ -5632,6 +5638,7 @@ function attachRemoteStream(stream){
     const remoteAudio = document.getElementById("remote-audio");
     remoteAudio.muted = false;
     remoteAudio.volume = 1;
+    remoteAudio.setAttribute("playsinline", "");
 
     if(remoteVideo.srcObject !== stream){
         remoteVideo.srcObject = stream;
@@ -5639,6 +5646,10 @@ function attachRemoteStream(stream){
 
     if(remoteAudio.srcObject !== stream){
         remoteAudio.srcObject = stream;
+    }
+
+    if(callAudioUnlocked || callModal().classList.contains("open")){
+        playRemoteAudio();
     }
 }
 
@@ -5649,7 +5660,9 @@ function playRemoteAudio(){
     if(remoteAudio && remoteAudio.play){
         remoteAudio.muted = false;
         remoteAudio.volume = 1;
+        remoteAudio.setAttribute("playsinline", "");
         return remoteAudio.play().then(() => {
+            callAudioUnlocked = true;
             if(soundButton){
                 soundButton.hidden = true;
             }
@@ -5668,19 +5681,23 @@ function unlockCallAudio(){
     const remoteAudio = document.getElementById("remote-audio");
     const remoteVideo = document.getElementById("remote-video");
     const soundButton = document.getElementById("call-sound-btn");
+    callAudioUnlocked = true;
 
     if(remoteAudio){
         remoteAudio.muted = false;
         remoteAudio.volume = 1;
-        remoteAudio.play().then(() => {
-            if(soundButton){
-                soundButton.hidden = true;
-            }
-        }).catch(() => {
-            if(soundButton){
-                soundButton.hidden = false;
-            }
-        });
+
+        if(remoteAudio.srcObject){
+            remoteAudio.play().then(() => {
+                if(soundButton){
+                    soundButton.hidden = true;
+                }
+            }).catch(() => {
+                if(soundButton){
+                    soundButton.hidden = false;
+                }
+            });
+        }
     }
 
     if(remoteVideo && activeCall.type === "video"){
@@ -5716,7 +5733,43 @@ async function prepareLocalMedia(callType){
     });
     activeCall.localStream = stream;
     document.getElementById("local-video").srcObject = stream;
+
+    const audioTrack = stream.getAudioTracks()[0];
+
+    if(!audioTrack || audioTrack.readyState !== "live"){
+        throw new Error("Microphone did not start");
+    }
+
     return stream;
+}
+
+function attachLocalTracksToPeer(stream){
+    if(!activeCall.peer || !stream){
+        return;
+    }
+
+    stream.getTracks().forEach(function(track){
+        const existingSender = activeCall.peer.getSenders().find(function(sender){
+            return sender.track === track;
+        });
+
+        if(existingSender){
+            return;
+        }
+
+        if(track.kind === "audio"){
+            const audioSender = activeCall.peer.getSenders().find(function(sender){
+                return sender.track === null;
+            });
+
+            if(audioSender && audioSender.replaceTrack){
+                audioSender.replaceTrack(track);
+                return;
+            }
+        }
+
+        activeCall.peer.addTrack(track, stream);
+    });
 }
 
 async function addLocalVideoTrack(){
@@ -5738,7 +5791,7 @@ async function addLocalVideoTrack(){
     document.getElementById("local-video").srcObject = activeCall.localStream;
 
     if(activeCall.peer && videoTrack){
-        activeCall.peer.addTrack(videoTrack, activeCall.localStream);
+        attachLocalTracksToPeer(activeCall.localStream);
     }
 
     return videoTrack;
@@ -5810,7 +5863,7 @@ async function startCall(callType){
     try {
         const stream = await prepareLocalMedia(callType);
         activeCall.peer = createPeer();
-        stream.getTracks().forEach(track => activeCall.peer.addTrack(track, stream));
+        attachLocalTracksToPeer(stream);
 
         const offer = await activeCall.peer.createOffer();
         await activeCall.peer.setLocalDescription(offer);
@@ -5852,7 +5905,7 @@ async function acceptIncomingCall(){
         activeCall.status = "answering";
         activeCall.peer = createPeer();
         const stream = await prepareLocalMedia(activeCall.type);
-        stream.getTracks().forEach(track => activeCall.peer.addTrack(track, stream));
+        attachLocalTracksToPeer(stream);
 
         await activeCall.peer.setRemoteDescription(new RTCSessionDescription(activeCall.incomingOffer));
         await flushQueuedRemoteIce();
@@ -6814,11 +6867,12 @@ function supportsLiveVoiceRecorder(){
 
 function voiceMimeType(){
     const types = [
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/mp4",
         "audio/webm;codecs=opus",
         "audio/webm",
         "audio/ogg;codecs=opus",
-        "audio/ogg",
-        "audio/mp4"
+        "audio/ogg"
     ];
 
     return types.find(type => MediaRecorder.isTypeSupported(type)) || "";
@@ -6864,6 +6918,48 @@ function audioControlsFor(id){
     };
 }
 
+function canBrowserPlayAudio(src, mimeType = ""){
+    const audio = document.createElement("audio");
+    const type = String(mimeType || "").toLowerCase();
+    const path = String(src || "").toLowerCase().split("?")[0];
+
+    if(type && audio.canPlayType(type)){
+        return audio.canPlayType(type) !== "";
+    }
+
+    if(path.endsWith(".webm")){
+        return audio.canPlayType('audio/webm; codecs="opus"') !== "" || audio.canPlayType("audio/webm") !== "";
+    }
+
+    if(path.endsWith(".ogg") || path.endsWith(".oga")){
+        return audio.canPlayType('audio/ogg; codecs="opus"') !== "" || audio.canPlayType("audio/ogg") !== "";
+    }
+
+    if(path.endsWith(".m4a") || path.endsWith(".mp4") || path.endsWith(".aac")){
+        return audio.canPlayType("audio/mp4") !== "" || audio.canPlayType("audio/aac") !== "";
+    }
+
+    if(path.endsWith(".mp3")){
+        return audio.canPlayType("audio/mpeg") !== "";
+    }
+
+    if(path.endsWith(".wav")){
+        return audio.canPlayType("audio/wav") !== "";
+    }
+
+    return true;
+}
+
+function openUnsupportedVoice(audio){
+    const src = audio ? audio.currentSrc || audio.src : "";
+
+    if(src){
+        window.open(src, "_blank", "noopener");
+    }
+
+    alert("This phone cannot play this old voice-note format. New voice notes will be saved in mobile-friendly audio.");
+}
+
 function setVoiceWaveProgress(wave, percent){
     if(!wave){
         return;
@@ -6894,6 +6990,19 @@ function initializeVoicePlayers(){
     document.querySelectorAll(".message-audio[data-audio-id]:not([data-audio-ready])").forEach(function(audio){
         audio.dataset.audioReady = "1";
         audio.playbackRate = 1;
+
+        if(!canBrowserPlayAudio(audio.src, audio.type || "")){
+            const controls = audioControlsFor(audio.dataset.audioId);
+
+            if(controls.time){
+                controls.time.textContent = "Open";
+            }
+
+            if(controls.button){
+                controls.button.setAttribute("title", "Open voice note");
+                controls.button.setAttribute("aria-label", "Open voice note");
+            }
+        }
 
         audio.addEventListener("loadedmetadata", function(){
             const controls = audioControlsFor(audio.dataset.audioId);
@@ -6940,6 +7049,16 @@ function initializeVoicePlayers(){
 
             if(controls.time){
                 controls.time.textContent = formatAudioTime(audio.duration);
+            }
+
+            setAudioButton(controls.button, false);
+        });
+
+        audio.addEventListener("error", function(){
+            const controls = audioControlsFor(audio.dataset.audioId);
+
+            if(controls.time){
+                controls.time.textContent = "Open";
             }
 
             setAudioButton(controls.button, false);
@@ -8839,8 +8958,13 @@ document.getElementById("messages").addEventListener("click", function(event){
             return;
         }
 
+        if(!canBrowserPlayAudio(controls.audio.src, controls.audio.type || "")){
+            openUnsupportedVoice(controls.audio);
+            return;
+        }
+
         if(controls.audio.paused){
-            controls.audio.play().catch(() => alert("Voice note could not be played."));
+            controls.audio.play().catch(() => openUnsupportedVoice(controls.audio));
         } else {
             controls.audio.pause();
         }
