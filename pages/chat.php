@@ -128,6 +128,30 @@ mysqli_stmt_bind_param($stmt, "i", $current_user);
 mysqli_stmt_execute($stmt);
 $users = mysqli_stmt_get_result($stmt);
 
+$groupStmt = mysqli_prepare($conn, "
+    SELECT
+        c.id,
+        c.title,
+        c.image,
+        COUNT(DISTINCT cm_all.id) AS member_count,
+        MAX(m.created_at) AS last_message_at
+    FROM conversations c
+    JOIN conversation_members cm_self
+        ON cm_self.conversation_id = c.id
+        AND cm_self.user_id = ?
+    LEFT JOIN conversation_members cm_all
+        ON cm_all.conversation_id = c.id
+    LEFT JOIN messages m
+        ON m.conversation_id = c.id
+        AND m.is_deleted = 0
+    WHERE c.type = 'group'
+    GROUP BY c.id, c.title, c.image
+    ORDER BY COALESCE(MAX(m.created_at), c.created_at) DESC
+");
+mysqli_stmt_bind_param($groupStmt, "i", $current_user);
+mysqli_stmt_execute($groupStmt);
+$groups = mysqli_stmt_get_result($groupStmt);
+
 function effectivePresenceStatus($status, $last_seen, $timeout_seconds = 60)
 {
     if ($status === 'away') {
@@ -1089,7 +1113,21 @@ body{
     font-size:13px;
 }
 
-.message-menu button:hover{
+.message-menu a{
+    width:100%;
+    border-radius:6px;
+    background:#ffffff;
+    padding:9px 10px;
+    text-align:left;
+    color:#111827;
+    cursor:pointer;
+    font-size:13px;
+    display:block;
+    text-decoration:none;
+}
+
+.message-menu button:hover,
+.message-menu a:hover{
     background:#f1f5f9;
 }
 
@@ -1976,9 +2014,42 @@ body{
     color:#94A3B8;
 }
 
+.new-group-btn{
+    width:100%;
+    min-height:42px;
+    margin-top:14px;
+    border:1px solid rgba(56,112,255,.24);
+    border-radius:14px;
+    background:#F1F6FF;
+    color:var(--primary);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    font-size:14px;
+    font-weight:850;
+    cursor:pointer;
+    transition:background var(--transition),border-color var(--transition),transform var(--transition);
+}
+
+.new-group-btn:hover{
+    background:#EAF2FF;
+    border-color:rgba(56,112,255,.38);
+    transform:translateY(-1px);
+}
+
 .user-list{
     padding:12px;
     overflow-y:auto;
+}
+
+.list-section-label{
+    margin:14px 8px 8px;
+    color:#94A3B8;
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:.08em;
+    text-transform:uppercase;
 }
 
 .empty-users{
@@ -2043,6 +2114,128 @@ body{
     width:100%;
     height:100%;
     object-fit:cover;
+}
+
+.group-avatar{
+    border-radius:16px;
+    background:linear-gradient(135deg,#0EA5E9,#2563EB);
+}
+
+.group-create-form{
+    display:grid;
+    gap:14px;
+}
+
+.group-name-field{
+    display:grid;
+    gap:7px;
+    color:#334155;
+    font-size:12px;
+    font-weight:850;
+}
+
+.group-name-field input{
+    width:100%;
+    height:44px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:0 13px;
+    color:var(--text);
+    font-size:14px;
+    outline:0;
+}
+
+.group-name-field input:focus{
+    border-color:rgba(56,112,255,.55);
+    box-shadow:0 0 0 3px rgba(56,112,255,.12);
+}
+
+.group-member-list{
+    display:grid;
+    gap:8px;
+    max-height:320px;
+    overflow:auto;
+}
+
+.group-member-row{
+    min-height:58px;
+    padding:9px 10px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    cursor:pointer;
+    background:#FFFFFF;
+}
+
+.group-member-row:hover{
+    border-color:rgba(56,112,255,.28);
+    background:#F8FBFF;
+}
+
+.group-member-row input{
+    width:16px;
+    height:16px;
+    accent-color:var(--primary);
+}
+
+.group-member-avatar{
+    width:38px;
+    height:38px;
+    flex:0 0 38px;
+    border-radius:50%;
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    color:#FFFFFF;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    font-size:13px;
+    font-weight:900;
+}
+
+.group-member-avatar img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+.group-member-avatar .avatar{
+    width:38px;
+    height:38px;
+    flex-basis:38px;
+    box-shadow:none;
+    font-size:13px;
+}
+
+.group-member-copy{
+    min-width:0;
+    display:grid;
+    gap:2px;
+}
+
+.group-member-copy strong,
+.group-member-copy small{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.group-member-copy strong{
+    color:#172033;
+    font-size:14px;
+}
+
+.group-member-copy small{
+    color:var(--muted);
+    font-size:12px;
+}
+
+.group-create-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
 }
 
 .user-info{
@@ -2385,7 +2578,8 @@ body{
     box-shadow:0 22px 45px rgba(15,23,42,.16);
 }
 
-.message-menu button{
+.message-menu button,
+.message-menu a{
     border-radius:10px;
     font-weight:700;
 }
@@ -4449,6 +4643,225 @@ body{
     }
 }
 
+/* Final responsive safety pass for phones, tablets, and wide screens */
+@supports (height: 100dvh){
+    .page-shell{
+        height:100dvh;
+    }
+
+    .chat-container{
+        height:calc(100dvh - 128px);
+    }
+}
+
+.image-view-button{
+    max-width:100%;
+    display:block;
+    padding:0;
+    border:0;
+    border-radius:14px;
+    background:transparent;
+    cursor:zoom-in;
+    overflow:hidden;
+}
+
+.image-lightbox{
+    position:fixed;
+    inset:0;
+    z-index:30000;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:18px;
+    background:rgba(15,23,42,.78);
+    backdrop-filter:blur(8px);
+}
+
+.image-lightbox.open{
+    display:flex;
+}
+
+.image-lightbox-stage{
+    position:relative;
+    width:min(980px,100%);
+    height:min(82dvh,760px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.image-lightbox img{
+    max-width:100%;
+    max-height:100%;
+    border-radius:12px;
+    object-fit:contain;
+    background:#FFFFFF;
+    box-shadow:0 30px 90px rgba(2,6,23,.45);
+}
+
+.image-lightbox-actions{
+    position:absolute;
+    top:12px;
+    right:12px;
+    display:flex;
+    gap:8px;
+}
+
+.image-lightbox-actions a,
+.image-lightbox-actions button,
+.call-sound-btn{
+    width:44px;
+    height:44px;
+    border:1px solid rgba(255,255,255,.28);
+    border-radius:14px;
+    background:rgba(15,23,42,.70);
+    color:#FFFFFF;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    text-decoration:none;
+}
+
+.call-sound-btn{
+    position:absolute;
+    left:50%;
+    bottom:16px;
+    transform:translateX(-50%);
+    width:auto;
+    min-width:138px;
+    gap:8px;
+    padding:0 14px;
+    font-weight:850;
+    font-size:13px;
+    z-index:3;
+}
+
+.call-sound-btn[hidden]{
+    display:none;
+}
+
+@media(min-width:1440px){
+    .chat-container,
+    .chat-topbar{
+        width:min(1360px,calc(100vw - 80px));
+    }
+
+    .chat-container{
+        grid-template-columns:380px minmax(0,1fr) auto;
+    }
+}
+
+@media(max-width:760px){
+    html,
+    body{
+        position:fixed;
+        inset:0;
+        width:100%;
+        height:100%;
+        overflow:hidden;
+    }
+
+    .page-shell{
+        height:100dvh;
+        overflow:hidden;
+    }
+
+    .chat-page{
+        height:100dvh;
+        min-height:0;
+        overflow:hidden;
+        padding-bottom:calc(64px + env(safe-area-inset-bottom));
+    }
+
+    .app-sidebar,
+    .page-shell.sidebar-collapsed .app-sidebar{
+        height:calc(64px + env(safe-area-inset-bottom));
+        min-height:calc(64px + env(safe-area-inset-bottom));
+        padding-bottom:calc(8px + env(safe-area-inset-bottom));
+    }
+
+    .chat-container{
+        height:calc(100dvh - 64px - env(safe-area-inset-bottom));
+        max-height:calc(100dvh - 64px - env(safe-area-inset-bottom));
+    }
+
+    body.mobile-chat-open .chat-container,
+    body.mobile-chat-open .chat-area{
+        height:100dvh;
+        max-height:100dvh;
+    }
+
+    .chat-area{
+        display:flex;
+        flex-direction:column;
+    }
+
+    #messages{
+        min-height:0;
+        flex:1 1 auto;
+        overflow-y:auto;
+        -webkit-overflow-scrolling:touch;
+        padding-bottom:14px;
+    }
+
+    .composer{
+        flex:0 0 auto;
+        padding-bottom:calc(10px + env(safe-area-inset-bottom));
+    }
+
+    .chat-header{
+        flex:0 0 auto;
+    }
+
+    .message-media,
+    .message-video{
+        max-width:min(100%,72vw);
+        max-height:46dvh;
+        object-fit:contain;
+    }
+
+    .call-box{
+        width:100%;
+        max-height:92dvh;
+        border-radius:16px;
+    }
+
+    .call-video-stage{
+        height:min(58dvh,420px);
+    }
+
+    .image-lightbox{
+        padding:10px;
+    }
+
+    .image-lightbox-stage{
+        height:88dvh;
+    }
+}
+
+@media(max-width:360px){
+    .composer{
+        grid-template-columns:36px 36px 36px minmax(0,1fr) 42px;
+    }
+
+    #media-btn{
+        display:none;
+    }
+
+    .composer-btn{
+        width:36px;
+        height:36px;
+        min-width:36px;
+    }
+
+    .send-btn{
+        width:42px;
+        height:42px;
+        flex-basis:42px;
+    }
+}
+
 </style>
 
 </head>
@@ -4499,6 +4912,10 @@ body{
 <div class="sidebar-head">
     <h2>Messages</h2>
     <p>Select a person to start chatting</p>
+    <button class="new-group-btn" type="button" id="new-group-btn">
+        <i class="fa-solid fa-user-group"></i>
+        <span>New Group</span>
+    </button>
     <div class="chat-list-search">
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="text" id="user-search-input" placeholder="Search users..." aria-label="Search users">
@@ -4506,6 +4923,55 @@ body{
 </div>
 
 <div class="user-list">
+
+<?php if(mysqli_num_rows($groups) > 0){ ?>
+<div class="list-section-label">Groups</div>
+<?php while($group=mysqli_fetch_assoc($groups)){
+    $groupTitle = $group['title'] ?: 'Group Chat';
+    $groupInitial = strtoupper(substr(trim($groupTitle), 0, 1));
+    $groupImage = $group['image'] ?? '';
+    $groupImageUrl = '';
+
+    if (!empty($groupImage)) {
+        $groupImageUrl = str_starts_with($groupImage, 'uploads/')
+            ? '../' . $groupImage
+            : '../uploads/' . $groupImage;
+    }
+?>
+
+<div
+class="user group-chat"
+data-is-group="1"
+data-conversation-id="<?php echo (int) $group['id']; ?>"
+data-user-id="0"
+data-user-name="<?php echo htmlspecialchars($groupTitle, ENT_QUOTES, 'UTF-8'); ?>"
+data-user-status="group"
+data-user-presence="<?php echo (int) $group['member_count']; ?> members"
+data-user-image="<?php echo htmlspecialchars($groupImageUrl, ENT_QUOTES, 'UTF-8'); ?>"
+>
+
+<div class="avatar group-avatar">
+    <?php if($groupImageUrl){ ?>
+        <img src="<?php echo htmlspecialchars($groupImageUrl); ?>" alt="<?php echo htmlspecialchars($groupTitle); ?>">
+    <?php } else { ?>
+        <?php echo htmlspecialchars($groupInitial); ?>
+    <?php } ?>
+</div>
+
+<div class="user-info">
+    <span class="user-name">
+        <?php echo htmlspecialchars($groupTitle); ?>
+    </span>
+    <span class="user-status">
+        <?php echo (int) $group['member_count']; ?> members
+    </span>
+</div>
+
+</div>
+
+<?php } ?>
+<div class="list-section-label">People</div>
+<?php } ?>
 
 <?php if(mysqli_num_rows($users) > 0){ ?>
 <?php while($user=mysqli_fetch_assoc($users)){
@@ -4810,11 +5276,16 @@ data-user-image="<?php echo htmlspecialchars($profileImageUrl, ENT_QUOTES, 'UTF-
             </button>
         </div>
         <div class="call-video-stage" id="call-video-stage">
-            <video id="remote-video" autoplay playsinline></video>
+            <video id="remote-video" autoplay muted playsinline></video>
+            <audio id="remote-audio" autoplay playsinline></audio>
             <video id="local-video" autoplay muted playsinline></video>
             <div class="call-audio-avatar" id="call-audio-avatar">
                 <i class="fa-solid fa-phone-volume"></i>
             </div>
+            <button class="call-sound-btn" type="button" id="call-sound-btn" hidden>
+                <i class="fa-solid fa-volume-high"></i>
+                <span>Enable sound</span>
+            </button>
         </div>
         <div class="call-controls">
             <button type="button" class="call-control-btn accept" id="call-accept" title="Accept" aria-label="Accept">
@@ -4828,6 +5299,20 @@ data-user-image="<?php echo htmlspecialchars($profileImageUrl, ENT_QUOTES, 'UTF-
             </button>
             <button type="button" class="call-control-btn danger" id="call-end" title="End call" aria-label="End call">
                 <i class="fa-solid fa-phone-slash"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="image-lightbox" id="image-lightbox" aria-hidden="true">
+    <div class="image-lightbox-stage">
+        <img id="image-lightbox-img" src="" alt="">
+        <div class="image-lightbox-actions">
+            <a id="image-lightbox-download" href="#" download title="Download image" aria-label="Download image">
+                <i class="fa-solid fa-download"></i>
+            </a>
+            <button type="button" id="image-lightbox-close" title="Close image" aria-label="Close image">
+                <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
     </div>
@@ -4876,7 +5361,8 @@ let selectedContact = {
     presence: "",
     status: "",
     image: "",
-    blocked: false
+    blocked: false,
+    isGroup: false
 };
 const currentUserId = <?php echo json_encode((int) $current_user); ?>;
 const selfConversationId = <?php echo json_encode((int) $selfConversationId); ?>;
@@ -4918,6 +5404,7 @@ let activeCall = {
     answered: false,
     polling: false,
     pendingIce: [],
+    queuedRemoteIce: [],
     upgradeOffer: null,
     upgradePrompted: false,
     upgradeRequested: false
@@ -4928,6 +5415,30 @@ const sidebarToggle = document.getElementById("sidebar-toggle");
 
 function callModal(){
     return document.getElementById("call-modal");
+}
+
+function mediaPermissionMessage(error, action){
+    if(!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1"){
+        return action + " needs HTTPS on mobile. Open this site with HTTPS or test on localhost.";
+    }
+
+    if(error && error.name === "NotAllowedError"){
+        return "Please allow microphone/camera permission, then try again.";
+    }
+
+    if(error && error.name === "NotFoundError"){
+        return "No microphone/camera was found on this device.";
+    }
+
+    if(error && error.name === "NotReadableError"){
+        return "Microphone/camera is busy in another app.";
+    }
+
+    return action + " could not start on this device.";
+}
+
+function isMediaAccessError(error){
+    return error && ["NotAllowedError", "NotFoundError", "NotReadableError", "OverconstrainedError", "SecurityError"].includes(error.name);
 }
 
 function setCallStatus(title, status){
@@ -4941,6 +5452,7 @@ function openCallModal(mode, callType, title, status){
     modal.classList.toggle("incoming", mode === "incoming");
     modal.classList.toggle("audio-call", callType !== "video");
     modal.setAttribute("aria-hidden", "false");
+    document.getElementById("call-sound-btn").hidden = true;
     document.getElementById("call-camera").style.display = "";
     document.getElementById("call-camera").setAttribute("title", callType === "video" ? "Toggle camera" : "Convert to video call");
     document.getElementById("call-camera").setAttribute("aria-label", callType === "video" ? "Toggle camera" : "Convert to video call");
@@ -4952,7 +5464,9 @@ function closeCallModal(){
     modal.classList.remove("open", "incoming", "audio-call");
     modal.setAttribute("aria-hidden", "true");
     document.getElementById("remote-video").srcObject = null;
+    document.getElementById("remote-audio").srcObject = null;
     document.getElementById("local-video").srcObject = null;
+    document.getElementById("call-sound-btn").hidden = true;
 }
 
 function callSignal(action, payload = {}){
@@ -4992,6 +5506,7 @@ function resetActiveCall(closeModal = true){
         answered: false,
         polling: false,
         pendingIce: [],
+        queuedRemoteIce: [],
         upgradeOffer: null,
         upgradePrompted: false,
         upgradeRequested: false
@@ -5011,8 +5526,18 @@ function ensureCallReady(){
         return false;
     }
 
+    if(selectedContact.isGroup){
+        alert("Group calls are not available yet.");
+        return false;
+    }
+
     if(selectedContact.blocked){
         alert("Unblock this user before calling.");
+        return false;
+    }
+
+    if(!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1"){
+        alert("Audio/video calls need HTTPS on mobile. Open this site with HTTPS or test on localhost.");
         return false;
     }
 
@@ -5048,10 +5573,15 @@ function createPeer(){
     peer.ontrack = function(event){
         if(!activeCall.remoteStream){
             activeCall.remoteStream = new MediaStream();
-            document.getElementById("remote-video").srcObject = activeCall.remoteStream;
+            attachRemoteStream(activeCall.remoteStream);
         }
 
-        activeCall.remoteStream.addTrack(event.track);
+        if(!activeCall.remoteStream.getTracks().includes(event.track)){
+            activeCall.remoteStream.addTrack(event.track);
+        }
+
+        attachRemoteStream(activeCall.remoteStream);
+        playRemoteAudio();
         setCallStatus(document.getElementById("call-title").textContent, "Connected");
     };
 
@@ -5062,6 +5592,67 @@ function createPeer(){
     };
 
     return peer;
+}
+
+function attachRemoteStream(stream){
+    const remoteVideo = document.getElementById("remote-video");
+    const remoteAudio = document.getElementById("remote-audio");
+    remoteAudio.muted = false;
+    remoteAudio.volume = 1;
+
+    if(remoteVideo.srcObject !== stream){
+        remoteVideo.srcObject = stream;
+    }
+
+    if(remoteAudio.srcObject !== stream){
+        remoteAudio.srcObject = stream;
+    }
+}
+
+function playRemoteAudio(){
+    const remoteAudio = document.getElementById("remote-audio");
+    const soundButton = document.getElementById("call-sound-btn");
+
+    if(remoteAudio && remoteAudio.play){
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1;
+        return remoteAudio.play().then(() => {
+            if(soundButton){
+                soundButton.hidden = true;
+            }
+        }).catch(() => {
+            if(soundButton){
+                soundButton.hidden = false;
+            }
+            setCallStatus(document.getElementById("call-title").textContent, "Tap the call window to hear audio");
+        });
+    }
+
+    return Promise.resolve();
+}
+
+function unlockCallAudio(){
+    const remoteAudio = document.getElementById("remote-audio");
+    const remoteVideo = document.getElementById("remote-video");
+    const soundButton = document.getElementById("call-sound-btn");
+
+    if(remoteAudio){
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1;
+        remoteAudio.play().then(() => {
+            if(soundButton){
+                soundButton.hidden = true;
+            }
+        }).catch(() => {
+            if(soundButton){
+                soundButton.hidden = false;
+            }
+        });
+    }
+
+    if(remoteVideo && activeCall.type === "video"){
+        remoteVideo.play().catch(() => {});
+    }
 }
 
 function flushPendingIce(){
@@ -5081,8 +5672,14 @@ function flushPendingIce(){
 
 async function prepareLocalMedia(callType){
     const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: callType === "video"
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        },
+        video: callType === "video" ? {
+            facingMode: "user"
+        } : false
     });
     activeCall.localStream = stream;
     document.getElementById("local-video").srcObject = stream;
@@ -5161,7 +5758,7 @@ async function requestVideoUpgrade(){
         callModal().classList.remove("audio-call");
         setCallStatus(document.getElementById("call-title").textContent, "Video request sent...");
     } catch (error) {
-        alert(error.message || "Camera permission is required to convert this call to video.");
+        alert(isMediaAccessError(error) ? mediaPermissionMessage(error, "Camera") : (error.message || "Video request could not be sent"));
     }
 }
 
@@ -5170,6 +5767,7 @@ async function startCall(callType){
         return;
     }
 
+    unlockCallAudio();
     resetActiveCall(false);
     activeCall.type = callType;
     activeCall.role = "caller";
@@ -5199,7 +5797,7 @@ async function startCall(callType){
         flushPendingIce();
         setCallStatus(selectedContact.name || "Contact", "Ringing...");
     } catch (error) {
-        alert(error.message || "Call could not be started. Please allow microphone/camera permission.");
+        alert(isMediaAccessError(error) ? mediaPermissionMessage(error, "Call") : (error.message || "Call could not be started"));
         resetActiveCall();
     }
 }
@@ -5214,6 +5812,8 @@ async function acceptIncomingCall(){
         return;
     }
 
+    unlockCallAudio();
+
     try {
         activeCall.role = "receiver";
         activeCall.status = "answering";
@@ -5222,6 +5822,7 @@ async function acceptIncomingCall(){
         stream.getTracks().forEach(track => activeCall.peer.addTrack(track, stream));
 
         await activeCall.peer.setRemoteDescription(new RTCSessionDescription(activeCall.incomingOffer));
+        await flushQueuedRemoteIce();
         const answer = await activeCall.peer.createAnswer();
         await activeCall.peer.setLocalDescription(answer);
 
@@ -5241,7 +5842,7 @@ async function acceptIncomingCall(){
         document.getElementById("call-camera").setAttribute("aria-label", activeCall.type === "video" ? "Toggle camera" : "Convert to video call");
         setCallStatus(document.getElementById("call-title").textContent, "Connected");
     } catch (error) {
-        alert(error.message || "Call could not be answered. Please allow microphone/camera permission.");
+        alert(isMediaAccessError(error) ? mediaPermissionMessage(error, "Call") : (error.message || "Call could not be answered"));
         endCall();
     }
 }
@@ -5254,6 +5855,7 @@ async function acceptVideoUpgrade(){
     try {
         await addLocalVideoTrack();
         await activeCall.peer.setRemoteDescription(new RTCSessionDescription(activeCall.upgradeOffer));
+        await flushQueuedRemoteIce();
         const answer = await activeCall.peer.createAnswer();
         await activeCall.peer.setLocalDescription(answer);
 
@@ -5268,7 +5870,7 @@ async function acceptVideoUpgrade(){
 
         switchCallToVideo("Video call connected");
     } catch (error) {
-        alert(error.message || "Camera permission is required to convert this call to video.");
+        alert(isMediaAccessError(error) ? mediaPermissionMessage(error, "Camera") : (error.message || "Video upgrade could not be accepted"));
         activeCall.status = "active";
         callModal().classList.remove("incoming");
         setCallStatus(document.getElementById("call-title").textContent, "Audio call connected");
@@ -5281,6 +5883,7 @@ async function applyRemoteAnswer(call){
     }
 
     await activeCall.peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(call.answer)));
+    await flushQueuedRemoteIce();
     activeCall.answered = true;
     activeCall.status = "active";
     setCallStatus(document.getElementById("call-title").textContent, "Connected");
@@ -5312,12 +5915,18 @@ async function processVideoUpgrade(call){
         && activeCall.upgradeRequested
     ){
         await activeCall.peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(call.upgrade_answer)));
+        await flushQueuedRemoteIce();
         switchCallToVideo("Video call connected");
     }
 }
 
 async function addRemoteIce(candidates){
-    if(!activeCall.peer || !candidates || !candidates.length){
+    if(!candidates || !candidates.length){
+        return;
+    }
+
+    if(!activeCall.peer || !activeCall.peer.remoteDescription){
+        activeCall.queuedRemoteIce.push(...candidates.filter(Boolean));
         return;
     }
 
@@ -5328,6 +5937,15 @@ async function addRemoteIce(candidates){
             } catch (error) {}
         }
     }
+}
+
+async function flushQueuedRemoteIce(){
+    if(!activeCall.peer || !activeCall.peer.remoteDescription || !activeCall.queuedRemoteIce.length){
+        return;
+    }
+
+    const candidates = activeCall.queuedRemoteIce.splice(0);
+    await addRemoteIce(candidates);
 }
 
 function showIncomingCall(call){
@@ -5503,7 +6121,11 @@ function buildAttachmentHtml(msg){
     }
 
     if(msg.message_type === "image"){
-        return `<img class="message-media" src="${safeAttachment}" alt="${fileName}" loading="lazy">`;
+        return `
+            <button class="image-view-button" type="button" data-open-image="${safeAttachment}" data-image-name="${fileName}" title="Open image" aria-label="Open image">
+                <img class="message-media" src="${safeAttachment}" alt="${fileName}" loading="lazy">
+            </button>
+        `;
     }
 
     if(msg.message_type === "video"){
@@ -5542,6 +6164,28 @@ function contactAvatarHtml(name, image){
     }
 
     return escapeHtml(String(name || "?").trim().charAt(0).toUpperCase() || "?");
+}
+
+function openImageLightbox(src, name){
+    const lightbox = document.getElementById("image-lightbox");
+    const image = document.getElementById("image-lightbox-img");
+    const download = document.getElementById("image-lightbox-download");
+
+    image.src = src;
+    image.alt = name || "Image";
+    download.href = src;
+    download.setAttribute("download", name || "image");
+    lightbox.classList.add("open");
+    lightbox.setAttribute("aria-hidden", "false");
+}
+
+function closeImageLightbox(){
+    const lightbox = document.getElementById("image-lightbox");
+    const image = document.getElementById("image-lightbox-img");
+
+    lightbox.classList.remove("open");
+    lightbox.setAttribute("aria-hidden", "true");
+    image.src = "";
 }
 
 function headerPresenceText(status, presence){
@@ -5640,7 +6284,8 @@ function renderPersonalWorkspace(){
         presence: "Saved Messages",
         status: selfProfile.status || "",
         image: selfProfile.image || "",
-        blocked: false
+        blocked: false,
+        isGroup: false
     };
     document.getElementById("chat-area").classList.add("personal-workspace");
     document.getElementById("saved-toolbar").style.display = "";
@@ -5668,9 +6313,15 @@ function updateContactUI(){
     document.getElementById("chat-header-avatar").innerHTML =
         contactAvatarHtml(selectedContact.name, selectedContact.image);
 
+    document.querySelectorAll(".call-action").forEach(function(button){
+        button.style.display = selectedContact.isGroup ? "none" : "";
+    });
+
     const blockLabel = selectedContact.blocked ? "Unblock User" : "Block User";
     const contactBlock = document.querySelector("[data-contact-action='block'] span");
     const menuBlock = document.querySelector("[data-more-action='block'] span");
+    const contactBlockRow = document.querySelector("[data-contact-action='block']");
+    const menuBlockButton = document.querySelector("[data-more-action='block']");
 
     if(contactBlock){
         contactBlock.innerHTML = `<i class="fa-solid fa-ban"></i> ${blockLabel}`;
@@ -5678,6 +6329,14 @@ function updateContactUI(){
 
     if(menuBlock){
         menuBlock.textContent = blockLabel;
+    }
+
+    if(contactBlockRow){
+        contactBlockRow.style.display = selectedContact.isGroup ? "none" : "";
+    }
+
+    if(menuBlockButton){
+        menuBlockButton.style.display = selectedContact.isGroup ? "none" : "";
     }
 }
 
@@ -5950,7 +6609,8 @@ function startChat(user_id, name, presence, status, image){
         presence: presence || "",
         status: status || "",
         image: image || "",
-        blocked: false
+        blocked: false,
+        isGroup: false
     };
     updateContactUI();
 
@@ -6048,6 +6708,42 @@ function sendMessage(){
 
 }
 
+function openGroupConversation(groupElement){
+    if(voiceRecorder && voiceRecorder.state === "recording"){
+        stopVoiceRecording(false);
+    }
+
+    document.body.classList.add("mobile-chat-open");
+    isPersonalWorkspace = false;
+    document.getElementById("chat-area").classList.remove("personal-workspace");
+    document.getElementById("saved-toolbar").style.display = "none";
+    document.getElementById("message-search-input").placeholder = "Search messages in this group...";
+    document.getElementById("message").placeholder = "Message this group...";
+
+    conversation_id = Number(groupElement.dataset.conversationId || 0);
+    selectedContact = {
+        id: 0,
+        name: groupElement.dataset.userName || "Group Chat",
+        presence: groupElement.dataset.userPresence || "Group",
+        status: "group",
+        image: groupElement.dataset.userImage || "",
+        blocked: false,
+        isGroup: true
+    };
+
+    document.getElementById("chat-user").textContent = selectedContact.name;
+    const presenceElement = document.getElementById("chat-presence");
+    presenceElement.textContent = selectedContact.presence;
+    presenceElement.classList.remove("online");
+    document.getElementById("typing-status").textContent = "";
+
+    updateContactUI();
+    forceScrollToBottom = true;
+    lastMessagesSignature = "";
+    loadMessages();
+    getTypingStatus();
+}
+
 function ensureCanSendVoice(){
     if(conversation_id == 0){
         alert("Please select a user first.");
@@ -6059,12 +6755,16 @@ function ensureCanSendVoice(){
         return false;
     }
 
-    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
-        alert("Voice notes are not supported in this browser.");
+    if(!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1" && supportsLiveVoiceRecorder()){
+        alert("Voice notes need HTTPS on mobile. Open this site with HTTPS or test on localhost.");
         return false;
     }
 
     return true;
+}
+
+function supportsLiveVoiceRecorder(){
+    return Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 }
 
 function voiceMimeType(){
@@ -6264,7 +6964,18 @@ function startVoiceRecording(){
         return;
     }
 
-    navigator.mediaDevices.getUserMedia({ audio: true })
+    if(!supportsLiveVoiceRecorder()){
+        openFilePicker(document.getElementById("media-input"), "audio/*", "microphone");
+        return;
+    }
+
+    navigator.mediaDevices.getUserMedia({
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+        }
+    })
     .then(stream => {
         const mimeType = voiceMimeType();
         voiceStream = stream;
@@ -6308,7 +7019,7 @@ function startVoiceRecording(){
         setVoiceRecordingUI(true);
         voiceRecorder.start();
     })
-    .catch(() => alert("Microphone permission is required for voice notes."));
+    .catch(error => alert(mediaPermissionMessage(error, "Voice note")));
 }
 
 function toggleVoiceRecording(){
@@ -6453,6 +7164,9 @@ function loadMessages(){
                     : "";
                 const pinLabel = Number(msg.is_pinned || 0) === 1 ? "Unpin" : "Pin";
                 const starLabel = Number(msg.is_starred || 0) === 1 ? "Unstar" : "Star";
+                const downloadHtml = msg.attachment && Number(msg.is_view_once || 0) !== 1
+                    ? `<a href="../${escapeHtml(msg.attachment)}" download="${escapeHtml(msg.message || "attachment")}" data-download-message="${msg.id}">Download</a>`
+                    : "";
                 const metaHtml = buildMessageMeta(msg, isMine);
                 const reactionsHtml = buildReactionsHtml(msg.reactions);
                 const hasReactionClass = msg.reactions && msg.reactions.length > 0 ? "has-reaction" : "";
@@ -6484,6 +7198,7 @@ function loadMessages(){
                                 <button type="button" data-info-message="${msg.id}">Info</button>
                                 <button type="button" data-copy-message="${msg.id}">Copy</button>
                                 <button type="button" data-forward-message="${msg.id}">Forward</button>
+                                ${downloadHtml}
                                 <button type="button" data-delete-mode="me" data-message-id="${msg.id}">Delete for me</button>
                                 ${deleteForEveryone}
                             </div>
@@ -6684,7 +7399,7 @@ function openFilePicker(input, accept, capture = ""){
 }
 
 function openContactSharePicker(){
-    const users = Array.from(document.querySelectorAll(".user"));
+    const users = Array.from(document.querySelectorAll(".user:not(.group-chat)"));
 
     if(!users.length){
         openToolModal("Share Contact", "", `<div class="tool-empty">No contacts available.</div>`, false);
@@ -6701,6 +7416,106 @@ function openContactSharePicker(){
     }).join("") + `</div>`;
 
     openToolModal("Share Contact", "", body, false);
+}
+
+function openCreateGroupModal(){
+    const users = Array.from(document.querySelectorAll(".user:not(.group-chat)"));
+
+    if(!users.length){
+        openToolModal("New Group", "", `<div class="tool-empty">No users available for a group.</div>`, false);
+        return;
+    }
+
+    const memberRows = users.map(function(user){
+        const name = user.dataset.userName || "User";
+        const presence = user.dataset.userPresence || "";
+        const image = user.dataset.userImage || "";
+
+        return `
+            <label class="group-member-row" data-tool-name="${escapeHtml(name.toLowerCase())}">
+                <input type="checkbox" name="group_members" value="${escapeHtml(user.dataset.userId || "")}">
+                <span class="group-member-avatar">${contactAvatarHtml(name, image)}</span>
+                <span class="group-member-copy">
+                    <strong>${escapeHtml(name)}</strong>
+                    <small>${escapeHtml(presence)}</small>
+                </span>
+            </label>
+        `;
+    }).join("");
+
+    openToolModal("New Group", "", `
+        <form class="group-create-form" id="group-create-form">
+            <label class="group-name-field">
+                <span>Group name</span>
+                <input type="text" id="group-name-input" maxlength="120" autocomplete="off" required>
+            </label>
+            <div class="group-member-list">
+                ${memberRows}
+            </div>
+            <div class="group-create-actions">
+                <button type="button" class="secondary" id="group-cancel">Cancel</button>
+                <button type="submit" class="primary" id="group-submit">Create Group</button>
+            </div>
+        </form>
+    `);
+
+    document.getElementById("tool-search").placeholder = "Search users...";
+    document.getElementById("group-name-input").focus();
+}
+
+function submitCreateGroup(event){
+    event.preventDefault();
+
+    const nameInput = document.getElementById("group-name-input");
+    const submitButton = document.getElementById("group-submit");
+    const groupName = nameInput ? nameInput.value.trim() : "";
+    const members = Array.from(document.querySelectorAll("input[name='group_members']:checked"))
+        .map(function(input){
+            return input.value;
+        })
+        .filter(Boolean);
+
+    if(groupName === ""){
+        alert("Please enter a group name.");
+        return;
+    }
+
+    if(members.length < 2){
+        alert("Please select at least 2 members.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("title", groupName);
+    members.forEach(function(memberId){
+        formData.append("members[]", memberId);
+    });
+
+    if(submitButton){
+        submitButton.disabled = true;
+        submitButton.textContent = "Creating...";
+    }
+
+    fetch("../ajax/create_group.php", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.status !== "success"){
+            alert(data.message || "Group could not be created");
+            return;
+        }
+
+        window.location.href = "chat.php?conversation_id=" + encodeURIComponent(data.conversation_id) + "&user=" + encodeURIComponent(data.title || groupName) + "&group=1";
+    })
+    .catch(() => alert("Server error while creating group"))
+    .finally(() => {
+        if(submitButton){
+            submitButton.disabled = false;
+            submitButton.textContent = "Create Group";
+        }
+    });
 }
 
 function handleAttachmentOption(option){
@@ -6953,6 +7768,12 @@ document.querySelector(".user-list").addEventListener("click", function(event){
     });
 
     userElement.classList.add("active");
+
+    if(userElement.dataset.isGroup === "1"){
+        openGroupConversation(userElement);
+        return;
+    }
+
     startChat(
         userElement.dataset.userId,
         userElement.dataset.userName,
@@ -6961,6 +7782,8 @@ document.querySelector(".user-list").addEventListener("click", function(event){
         userElement.dataset.userImage
     );
 });
+
+document.getElementById("new-group-btn").addEventListener("click", openCreateGroupModal);
 
 function openContactPanel(){
     document.getElementById("contact-panel").classList.add("open");
@@ -7697,6 +8520,18 @@ document.getElementById("call-end").addEventListener("click", endCall);
 document.getElementById("call-close").addEventListener("click", endCall);
 document.getElementById("call-mic").addEventListener("click", toggleCallMic);
 document.getElementById("call-camera").addEventListener("click", toggleCallCamera);
+document.getElementById("call-modal").addEventListener("click", playRemoteAudio);
+document.getElementById("call-sound-btn").addEventListener("click", function(event){
+    event.stopPropagation();
+    unlockCallAudio();
+});
+
+document.getElementById("image-lightbox-close").addEventListener("click", closeImageLightbox);
+document.getElementById("image-lightbox").addEventListener("click", function(event){
+    if(event.target.id === "image-lightbox"){
+        closeImageLightbox();
+    }
+});
 
 document.getElementById("contact-toggle").addEventListener("click", function(event){
     event.stopPropagation();
@@ -7751,6 +8586,11 @@ document.getElementById("tool-modal").addEventListener("click", function(event){
     const unstar = event.target.closest("[data-unstar-message]");
     const wallpaperChoice = event.target.closest("[data-wallpaper-type]");
     const shareContact = event.target.closest("[data-share-contact]");
+
+    if(event.target.id === "group-cancel"){
+        closeToolModal();
+        return;
+    }
 
     if(event.target.id === "media-once-toggle" || event.target.closest("#media-once-toggle")){
         setViewOnce(!isViewOnce);
@@ -7842,6 +8682,12 @@ document.getElementById("tool-modal").addEventListener("input", function(event){
     }
 });
 
+document.getElementById("tool-modal").addEventListener("submit", function(event){
+    if(event.target.id === "group-create-form"){
+        submitCreateGroup(event);
+    }
+});
+
 document.getElementById("tool-modal").addEventListener("change", function(event){
     if(event.target.id === "wallpaper-file-input"){
         uploadWallpaperImage(event.target.files[0]);
@@ -7866,6 +8712,7 @@ document.addEventListener("keydown", function(event){
         closeContactPanel();
         closeMoreMenu();
         closeToolModal();
+        closeImageLightbox();
     }
 });
 
@@ -7901,6 +8748,7 @@ document.getElementById("media-input").addEventListener("change", function(){
 });
 
 document.getElementById("messages").addEventListener("click", function(event){
+    const imageButton = event.target.closest("[data-open-image]");
     const audioToggle = event.target.closest("[data-audio-toggle]");
     const audioSpeed = event.target.closest("[data-audio-speed]");
     const menuButton = event.target.closest("[data-menu-message]");
@@ -7911,6 +8759,11 @@ document.getElementById("messages").addEventListener("click", function(event){
     const starButton = event.target.closest("[data-star-message]");
     const pinButton = event.target.closest("[data-pin-message]");
     const infoButton = event.target.closest("[data-info-message]");
+
+    if(imageButton){
+        openImageLightbox(imageButton.dataset.openImage, imageButton.dataset.imageName || "Image");
+        return;
+    }
 
     if(audioToggle){
         const controls = audioControlsFor(audioToggle.dataset.audioToggle);
@@ -8098,6 +8951,7 @@ document.addEventListener("click", function(event){
 
 const initialParams = new URLSearchParams(window.location.search);
 const initialConversationId = Number(initialParams.get("conversation_id") || 0);
+const initialIsGroup = initialParams.get("group") === "1";
 
 applyChatWallpaper(chatWallpaper);
 
@@ -8106,20 +8960,22 @@ if(initialConversationId > 0){
     isPersonalWorkspace = false;
     document.getElementById("chat-area").classList.remove("personal-workspace");
     document.getElementById("saved-toolbar").style.display = "none";
-    document.getElementById("message-search-input").placeholder = "Search messages in this chat...";
+    document.getElementById("message-search-input").placeholder = initialIsGroup ? "Search messages in this group..." : "Search messages in this chat...";
+    document.getElementById("message").placeholder = initialIsGroup ? "Message this group..." : "Type a message...";
     conversation_id = initialConversationId;
     lastMessagesSignature = "";
     document.getElementById("chat-user").textContent = initialParams.get("user") || "Chat";
     selectedContact = {
         id: 0,
         name: initialParams.get("user") || "Chat",
-        presence: "",
-        status: "",
+        presence: initialIsGroup ? "Group" : "",
+        status: initialIsGroup ? "group" : "",
         image: "",
-        blocked: false
+        blocked: false,
+        isGroup: initialIsGroup
     };
     updateContactUI();
-    document.getElementById("chat-presence").textContent = "";
+    document.getElementById("chat-presence").textContent = initialIsGroup ? "Group" : "";
     forceScrollToBottom = true;
     loadMessages();
     getTypingStatus();
