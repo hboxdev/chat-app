@@ -1059,6 +1059,11 @@ body{
     color:#cbd5e1;
 }
 
+.call-control-btn.is-on{
+    background:#2563eb;
+    color:#ffffff;
+}
+
 .seen-text{
     display:block;
     margin-top:4px;
@@ -4944,6 +4949,17 @@ textarea{
         border-radius:16px;
     }
 
+    .call-controls{
+        gap:8px;
+        padding:12px;
+        flex-wrap:wrap;
+    }
+
+    .call-control-btn{
+        width:46px;
+        height:46px;
+    }
+
     .call-video-stage{
         height:min(58dvh,420px);
     }
@@ -5408,7 +5424,7 @@ data-user-image="<?php echo htmlspecialchars($profileImageUrl, ENT_QUOTES, 'UTF-
             </button>
         </div>
         <div class="call-video-stage" id="call-video-stage">
-            <video id="remote-video" autoplay muted playsinline></video>
+            <video id="remote-video" autoplay playsinline></video>
             <audio id="remote-audio" autoplay playsinline></audio>
             <video id="local-video" autoplay muted playsinline></video>
             <div class="call-audio-avatar" id="call-audio-avatar">
@@ -5425,6 +5441,9 @@ data-user-image="<?php echo htmlspecialchars($profileImageUrl, ENT_QUOTES, 'UTF-
             </button>
             <button type="button" class="call-control-btn" id="call-mic" title="Mute microphone" aria-label="Mute microphone">
                 <i class="fa-solid fa-microphone"></i>
+            </button>
+            <button type="button" class="call-control-btn" id="call-speaker" title="Loud speaker" aria-label="Loud speaker">
+                <i class="fa-solid fa-volume-high"></i>
             </button>
             <button type="button" class="call-control-btn" id="call-camera" title="Toggle camera" aria-label="Toggle camera">
                 <i class="fa-solid fa-video"></i>
@@ -5553,6 +5572,7 @@ let activeCall = {
     upgradeRequested: false
 };
 let callAudioUnlocked = false;
+let callSpeakerOn = false;
 
 const pageShell = document.querySelector(".page-shell");
 const sidebarToggle = document.getElementById("sidebar-toggle");
@@ -5612,6 +5632,8 @@ function closeCallModal(){
     document.getElementById("local-video").srcObject = null;
     document.getElementById("call-sound-btn").hidden = true;
     callAudioUnlocked = false;
+    callSpeakerOn = false;
+    document.getElementById("call-speaker").classList.remove("is-on");
 }
 
 function callSignal(action, payload = {}){
@@ -5659,6 +5681,7 @@ function resetActiveCall(closeModal = true){
 
     document.getElementById("call-mic").classList.remove("is-off");
     document.getElementById("call-camera").classList.remove("is-off");
+    document.getElementById("call-speaker").classList.remove("is-on");
 
     if(closeModal){
         closeCallModal();
@@ -5790,6 +5813,35 @@ function playRemoteAudio(){
     return Promise.resolve();
 }
 
+async function applySpeakerMode(){
+    const remoteAudio = document.getElementById("remote-audio");
+    const remoteVideo = document.getElementById("remote-video");
+    const targetSink = callSpeakerOn ? "default" : "";
+
+    [remoteAudio, remoteVideo].forEach(function(media){
+        if(!media){
+            return;
+        }
+
+        media.muted = false;
+        media.volume = 1;
+
+        if(typeof media.setSinkId === "function"){
+            media.setSinkId(targetSink).catch(() => {});
+        }
+    });
+
+    document.getElementById("call-speaker").classList.toggle("is-on", callSpeakerOn);
+    document.getElementById("call-speaker").setAttribute("title", callSpeakerOn ? "Speaker on" : "Loud speaker");
+    document.getElementById("call-speaker").setAttribute("aria-label", callSpeakerOn ? "Speaker on" : "Loud speaker");
+    await playRemoteAudio();
+}
+
+function toggleCallSpeaker(){
+    callSpeakerOn = !callSpeakerOn;
+    applySpeakerMode();
+}
+
 function unlockCallAudio(){
     const remoteAudio = document.getElementById("remote-audio");
     const remoteVideo = document.getElementById("remote-video");
@@ -5818,6 +5870,8 @@ function unlockCallAudio(){
         remoteVideo.volume = 1;
         remoteVideo.play().catch(() => {});
     }
+
+    applySpeakerMode();
 }
 
 function flushPendingIce(){
@@ -5874,6 +5928,33 @@ function attachLocalTracksToPeer(stream){
 
         activeCall.peer.addTrack(track, stream);
     });
+}
+
+function ensureMicTrackSending(){
+    if(!activeCall.peer || !activeCall.localStream){
+        return;
+    }
+
+    const audioTrack = activeCall.localStream.getAudioTracks()[0];
+
+    if(!audioTrack){
+        return;
+    }
+
+    audioTrack.enabled = true;
+
+    const audioSender = activeCall.peer.getSenders().find(function(sender){
+        return sender.track && sender.track.kind === "audio";
+    });
+
+    if(audioSender){
+        if(audioSender.track !== audioTrack && audioSender.replaceTrack){
+            audioSender.replaceTrack(audioTrack).catch(() => {});
+        }
+        return;
+    }
+
+    activeCall.peer.addTrack(audioTrack, activeCall.localStream);
 }
 
 async function addLocalVideoTrack(){
@@ -5968,6 +6049,7 @@ async function startCall(callType){
         const stream = await prepareLocalMedia(callType);
         activeCall.peer = createPeer();
         attachLocalTracksToPeer(stream);
+        ensureMicTrackSending();
 
         const offer = await activeCall.peer.createOffer();
         await activeCall.peer.setLocalDescription(offer);
@@ -6010,6 +6092,7 @@ async function acceptIncomingCall(){
         activeCall.peer = createPeer();
         const stream = await prepareLocalMedia(activeCall.type);
         attachLocalTracksToPeer(stream);
+        ensureMicTrackSending();
 
         await activeCall.peer.setRemoteDescription(new RTCSessionDescription(activeCall.incomingOffer));
         await flushQueuedRemoteIce();
@@ -6027,6 +6110,7 @@ async function acceptIncomingCall(){
 
         activeCall.status = "active";
         activeCall.answered = true;
+        ensureMicTrackSending();
         callModal().classList.remove("incoming");
         document.getElementById("call-camera").setAttribute("title", activeCall.type === "video" ? "Toggle camera" : "Convert to video call");
         document.getElementById("call-camera").setAttribute("aria-label", activeCall.type === "video" ? "Toggle camera" : "Convert to video call");
@@ -6076,6 +6160,7 @@ async function applyRemoteAnswer(call){
     await flushQueuedRemoteIce();
     activeCall.answered = true;
     activeCall.status = "active";
+    ensureMicTrackSending();
     setCallStatus(document.getElementById("call-title").textContent, "Connected");
 }
 
@@ -6214,6 +6299,12 @@ function toggleCallMic(){
     if(audioTrack){
         audioTrack.enabled = !audioTrack.enabled;
         document.getElementById("call-mic").classList.toggle("is-off", !audioTrack.enabled);
+        document.getElementById("call-mic").setAttribute("title", audioTrack.enabled ? "Mute microphone" : "Unmute microphone");
+        document.getElementById("call-mic").setAttribute("aria-label", audioTrack.enabled ? "Mute microphone" : "Unmute microphone");
+
+        if(audioTrack.enabled){
+            ensureMicTrackSending();
+        }
     }
 }
 
@@ -8800,6 +8891,7 @@ document.getElementById("call-accept").addEventListener("click", acceptIncomingC
 document.getElementById("call-end").addEventListener("click", endCall);
 document.getElementById("call-close").addEventListener("click", endCall);
 document.getElementById("call-mic").addEventListener("click", toggleCallMic);
+document.getElementById("call-speaker").addEventListener("click", toggleCallSpeaker);
 document.getElementById("call-camera").addEventListener("click", toggleCallCamera);
 document.getElementById("call-modal").addEventListener("click", playRemoteAudio);
 document.getElementById("call-sound-btn").addEventListener("click", function(event){
