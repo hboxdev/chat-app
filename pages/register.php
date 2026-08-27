@@ -4,7 +4,19 @@ require_once __DIR__ . "/../config/config.php";
 
 chatweb_ensure_auth_schema($conn);
 chatweb_cleanup_rate_limits($conn);
-chatweb_redirect_if_logged_in($conn, "dashboard.php");
+$registerEmbedded = defined('CHATWEB_INDEX_REGISTER') && CHATWEB_INDEX_REGISTER;
+$setupProfilePath = $registerEmbedded ? 'pages/setup_profile.php' : 'setup_profile.php';
+$appPath = $registerEmbedded ? 'app/' : '../app/';
+$loginPath = $registerEmbedded ? 'pages/login.php' : 'login.php';
+
+chatweb_restore_login($conn);
+if (!empty($_SESSION['user_id'])) {
+    $userId = (int) $_SESSION['user_id'];
+    $result = mysqli_query($conn, "SELECT profile_completed, onboarding_completed FROM users WHERE id=$userId LIMIT 1");
+    $user = $result ? mysqli_fetch_assoc($result) : [];
+    header("Location: " . ((empty($user['profile_completed']) || empty($user['onboarding_completed'])) ? $setupProfilePath : $appPath));
+    exit();
+}
 
 $errors = [];
 $notice = "";
@@ -266,9 +278,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     chatweb_load_user_session($conn, $user);
                     chatweb_issue_remember_cookie($conn, $newUserId);
                     if (empty($user['profile_completed'])) {
-                        header("Location: setup_profile.php");
+                        header("Location: " . $setupProfilePath);
                     } else {
-                        header("Location: ../app/");
+                        header("Location: " . $appPath);
                     }
                     exit();
                 }
@@ -417,7 +429,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php } ?>
 
             <div class="register-link">
-                Already have an account? <a href="../index.php">Login here</a>
+                Already have an account? <a href="<?php echo h($loginPath); ?>">Login here</a>
             </div>
         </div>
     </main>

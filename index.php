@@ -25,5 +25,5 @@ if (!empty($_SESSION['user_id'])) {
     exit();
 }
 
-header("Location: pages/register.php");
-exit();
+define('CHATWEB_INDEX_REGISTER', true);
+require __DIR__ . "/pages/register.php";
