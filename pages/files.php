@@ -1,12 +1,9 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../config/session.php";
+require_once __DIR__ . "/../config/config.php";
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: ../index.php");
-    exit();
-}
+chatweb_ensure_auth_schema($conn);
+chatweb_require_login($conn, '../index.php');
 ?>
 
 <!DOCTYPE html>

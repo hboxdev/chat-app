@@ -1,62 +1,54 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/../config/session.php";
 include __DIR__ . "/../config/config.php";
+
+chatweb_ensure_auth_schema($conn);
+chatweb_redirect_if_logged_in($conn, "../app/");
 
 $error = "";
 
 if (isset($_POST['login'])) {
 
-    $email = mysqli_real_escape_string($conn, trim($_POST['email']));
+    $email = trim($_POST['email']);
     $password = trim($_POST['password']);
 
-    $sql = "SELECT * FROM users WHERE email='$email' LIMIT 1";
-    $result = mysqli_query($conn, $sql);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Enter a valid email address.";
+    } elseif (!chatweb_rate_limit($conn, 'login', $email . '|' . chatweb_client_ip(), 8, 900, 900)) {
+        $error = "Too many login attempts. Please try again later.";
+    } else {
+        $stmt = mysqli_prepare($conn, "SELECT * FROM users WHERE email=? LIMIT 1");
+        mysqli_stmt_bind_param($stmt, "s", $email);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
 
-    if (!$result) {
-        die(mysqli_error($conn));
-    }
+        if (mysqli_num_rows($result) == 1) {
 
-    if (mysqli_num_rows($result) == 1) {
+            $user = mysqli_fetch_assoc($result);
 
-        $user = mysqli_fetch_assoc($result);
+            if (password_verify($password, $user['password'])) {
 
-        // Password Verify
-        if (password_verify($password, $user['password'])) {
+                if (!chatweb_user_access_allowed($conn, (int) $user['id'])) {
+                    $error = "This account is restricted. Please contact support.";
+                } else {
+                chatweb_load_user_session($conn, $user);
+                chatweb_issue_remember_cookie($conn, (int) $user['id']);
+                header("Location: ../app/");
+                exit();
+                }
 
-            mysqli_query($conn, "UPDATE users SET status='online', last_seen=NOW() WHERE id=" . (int)$user['id']);
+            } else {
 
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['uuid'] = $user['uuid'];
-            $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['email'] = $user['email'];
-            $_SESSION['profile_image'] = $user['profile_image'];
-            $_SESSION['status'] = 'online';
+                $error = "Invalid email or password.";
 
-
-//             echo "<pre>";
-// print_r($user);
-
-// echo "<br><br>";
-
-// print_r($_SESSION);
-// exit();
-
-           header("Location: dashboard.php");
-exit();
+            }
 
         } else {
 
-            $error = "Invalid Password.";
+            $error = "Invalid email or password.";
 
         }
-
-    } else {
-
-        $error = "Email not found.";
-
+        mysqli_stmt_close($stmt);
     }
 
 }

@@ -1,47 +1,53 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/config/session.php";
 include "config/config.php";
+
+chatweb_ensure_auth_schema($conn);
+chatweb_redirect_if_logged_in($conn, "app/");
 
 $error = "";
 
 if(isset($_POST['login']))
 {
-    $email = mysqli_real_escape_string($conn, trim($_POST['email']));
+    $email = trim($_POST['email']);
     $password = trim($_POST['password']);
 
-    $sql = "SELECT * FROM users WHERE email='$email' LIMIT 1";
-    $result = mysqli_query($conn, $sql);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Enter a valid email address.";
+    } elseif (!chatweb_rate_limit($conn, 'login', $email . '|' . chatweb_client_ip(), 8, 900, 900)) {
+        $error = "Too many login attempts. Please try again later.";
+    } else {
+        $stmt = mysqli_prepare($conn, "SELECT * FROM users WHERE email=? LIMIT 1");
+        mysqli_stmt_bind_param($stmt, "s", $email);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
 
-    if(mysqli_num_rows($result) == 1)
-    {
-        $user = mysqli_fetch_assoc($result);
-
-        if(password_verify($password, $user['password']))
+        if(mysqli_num_rows($result) == 1)
         {
-            mysqli_query($conn, "UPDATE users SET status='online', last_seen=NOW() WHERE id=" . (int)$user['id']);
+            $user = mysqli_fetch_assoc($result);
 
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['uuid'] = $user['uuid'];
-            $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['email'] = $user['email'];
-            $_SESSION['profile_image'] = $user['profile_image'];
-            $_SESSION['status'] = 'online';
-            $_SESSION['is_active'] = $user['is_active'];
-
-            header("Location: pages/dashboard.php");
-            exit();
+            if(password_verify($password, $user['password']))
+            {
+                if (!chatweb_user_access_allowed($conn, (int) $user['id'])) {
+                    $error = "This account is restricted. Please contact support.";
+                } else {
+                chatweb_load_user_session($conn, $user);
+                chatweb_issue_remember_cookie($conn, (int) $user['id']);
+                header("Location: app/");
+                exit();
+                }
+            }
+            else
+            {
+                $error = "Invalid email or password.";
+            }
         }
         else
         {
-            $error = "Invalid password.";
+            $error = "Invalid email or password.";
         }
-    }
-    else
-    {
-        $error = "Email not found.";
+
+        mysqli_stmt_close($stmt);
     }
 }
 ?>

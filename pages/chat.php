@@ -1,14 +1,9 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
-}
-
+require_once __DIR__ . "/../config/session.php";
 include __DIR__ . "/../config/config.php";
+
+chatweb_ensure_auth_schema($conn);
+chatweb_require_login($conn, 'login.php');
 
 function ensure_chat_column($conn, $table, $column, $definition)
 {

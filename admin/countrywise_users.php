@@ -1,0 +1,6 @@
+<?php
+require __DIR__ . '/_guard.php';
+chatweb_admin_require_permission($conn, 'users.view');
+$rows = mysqli_query($conn, "SELECT COALESCE(NULLIF(country,''), NULLIF(detected_country,''), 'Unknown') country, COUNT(*) total FROM users WHERE deleted_at IS NULL GROUP BY COALESCE(NULLIF(country,''), NULLIF(detected_country,''), 'Unknown') ORDER BY total DESC");
+?>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Countrywise Users | Chat Web Admin</title><style>body{margin:0;background:#f7f7f8;font-family:Arial,sans-serif;color:#172033}.main{padding:30px}.panel{background:#fff;border-radius:10px;padding:22px;box-shadow:0 13px 30px rgba(15,23,42,.05);overflow:auto}a{color:#e6a300;text-decoration:none;font-weight:800}table{width:100%;border-collapse:collapse}th{background:#f0f0f1}th,td{text-align:left;padding:14px;border-bottom:1px solid #e5e7eb}</style></head><body><main class="main"><a href="index.php">Dashboard</a><h1>Countrywise User List</h1><section class="panel"><table><thead><tr><th>Country</th><th>Total Users</th></tr></thead><tbody><?php while($row=mysqli_fetch_assoc($rows)){ ?><tr><td><?php echo htmlspecialchars($row['country']); ?></td><td><?php echo (int)$row['total']; ?></td></tr><?php } ?></tbody></table></section></main></body></html>
