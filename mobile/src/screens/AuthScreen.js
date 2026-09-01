@@ -16,6 +16,9 @@ export function AuthScreen({ onAuthed }) {
       const data = await api.startAuth({ country: 'Pakistan', phone_number: phone, email });
       setChallengeId(data.challenge_id);
       setStep('otp');
+      if (data.dev_otp) {
+        Alert.alert('Test OTP', `Use ${data.dev_otp} to continue.`);
+      }
     } catch (error) {
       Alert.alert('Login failed', error.message);
     } finally {
@@ -80,4 +83,3 @@ const styles = StyleSheet.create({
   softButton: { alignItems: 'center', backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderRadius: 8, borderWidth: 1, justifyContent: 'center', marginTop: 10, minHeight: 52 },
   softText: { color: '#2563eb', fontWeight: '900' },
 });
-
