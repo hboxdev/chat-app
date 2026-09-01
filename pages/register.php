@@ -12,9 +12,7 @@ $loginPath = $registerEmbedded ? 'pages/login.php' : 'login.php';
 chatweb_restore_login($conn);
 if (!empty($_SESSION['user_id'])) {
     $userId = (int) $_SESSION['user_id'];
-    $result = mysqli_query($conn, "SELECT profile_completed, onboarding_completed FROM users WHERE id=$userId LIMIT 1");
-    $user = $result ? mysqli_fetch_assoc($result) : [];
-    header("Location: " . ((empty($user['profile_completed']) || empty($user['onboarding_completed'])) ? $setupProfilePath : $appPath));
+    header("Location: " . (chatweb_profile_setup_complete($conn, $userId) ? $appPath : $setupProfilePath));
     exit();
 }
 

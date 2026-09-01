@@ -25,7 +25,7 @@ function setup_next_step($user)
     if (empty($user['full_name']) || str_starts_with((string) $user['full_name'], 'User ')) {
         return 'name';
     }
-    if (empty($user['username_normalized'])) {
+    if (empty($user['username_normalized']) && empty($user['username'])) {
         return 'username';
     }
     if (empty($user['onboarding_completed'])) {
@@ -96,7 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'save_name') {
         $fullName = setup_clean_name($_POST['full_name'] ?? '');
-        if (mb_strlen($fullName) < 2 || mb_strlen($fullName) > 80) {
+        $nameLength = function_exists('mb_strlen') ? mb_strlen($fullName) : strlen($fullName);
+        if ($nameLength < 2 || $nameLength > 80) {
             $errors[] = 'Full name must be between 2 and 80 characters.';
             $step = 'name';
         } else {
@@ -156,16 +157,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['profile_image'] = $avatar;
             }
 
-            $fresh = mysqli_fetch_assoc(mysqli_query($conn, "SELECT full_name, username_normalized, phone_verified, email_verified FROM users WHERE id=$userId LIMIT 1")) ?: [];
-            if (empty($fresh['full_name']) || empty($fresh['username_normalized']) || (!((int) $fresh['phone_verified']) && !((int) $fresh['email_verified']))) {
-                $errors[] = 'Complete the required setup steps before opening WebChat.';
-                $step = setup_next_step($fresh);
-            } else {
-                mysqli_query($conn, "UPDATE users SET onboarding_completed=1, profile_completed=1, onboarding_step='complete' WHERE id=$userId");
-                mysqli_query($conn, "UPDATE user_profiles SET setup_completed_at=NOW() WHERE user_id=$userId");
-                header("Location: ../app/");
-                exit();
+            $fresh = mysqli_fetch_assoc(mysqli_query($conn, "SELECT full_name, username, username_normalized, email FROM users WHERE id=$userId LIMIT 1")) ?: [];
+            $fullName = setup_clean_name($fresh['full_name'] ?? '');
+            if ($fullName === '') {
+                $fullName = 'User ' . $userId;
             }
+
+            $username = strtolower(trim((string) ($fresh['username_normalized'] ?: $fresh['username'] ?: '')));
+            if ($username === '') {
+                $base = strtolower(strtok((string) ($fresh['email'] ?? ''), '@') ?: '');
+                $username = chatweb_available_username($conn, $base, $userId);
+            } else {
+                $username = chatweb_available_username($conn, $username, $userId);
+            }
+
+            $stmt = mysqli_prepare($conn, "UPDATE users SET full_name=?, username=?, username_normalized=?, onboarding_completed=1, profile_completed=1, onboarding_step='complete' WHERE id=?");
+            mysqli_stmt_bind_param($stmt, "sssi", $fullName, $username, $username, $userId);
+            if (!mysqli_stmt_execute($stmt)) {
+                throw new RuntimeException('Could not complete setup. Please try again.');
+            }
+            mysqli_stmt_close($stmt);
+
+            $stmt = mysqli_prepare($conn, "UPDATE user_profiles SET display_name=?, setup_completed_at=NOW() WHERE user_id=?");
+            mysqli_stmt_bind_param($stmt, "si", $fullName, $userId);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+
+            $_SESSION['full_name'] = $fullName;
+            $_SESSION['username'] = $username;
+
+            header("Location: ../app/");
+            exit();
         } catch (RuntimeException $e) {
             $errors[] = $e->getMessage();
             $step = 'photo';

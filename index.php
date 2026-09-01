@@ -14,9 +14,7 @@ if (!empty($_SESSION['user_id'])) {
         exit();
     }
 
-    $result = mysqli_query($conn, "SELECT profile_completed, onboarding_completed FROM users WHERE id=$userId LIMIT 1");
-    $user = $result ? mysqli_fetch_assoc($result) : [];
-    if (empty($user['profile_completed']) || empty($user['onboarding_completed'])) {
+    if (!chatweb_profile_setup_complete($conn, $userId)) {
         header("Location: pages/setup_profile.php");
         exit();
     }

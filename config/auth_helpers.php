@@ -8,6 +8,15 @@ const CHATWEB_OTP_TTL_MINUTES = 10;
 const CHATWEB_OTP_RESEND_SECONDS = 30;
 const CHATWEB_OTP_MAX_ATTEMPTS = 5;
 
+if (!function_exists('str_starts_with')) {
+    function str_starts_with($haystack, $needle)
+    {
+        $haystack = (string) $haystack;
+        $needle = (string) $needle;
+        return $needle === '' || strpos($haystack, $needle) === 0;
+    }
+}
+
 function chatweb_is_https()
 {
     return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -200,6 +209,39 @@ function chatweb_set_app_setting($conn, $key, $value, $adminId = null)
     mysqli_stmt_close($stmt);
 }
 
+function chatweb_profile_setup_complete($conn, $userId)
+{
+    $userId = (int) $userId;
+    if ($userId <= 0) {
+        return false;
+    }
+
+    $result = mysqli_query($conn, "SELECT full_name, username, username_normalized, profile_completed, onboarding_completed FROM users WHERE id=$userId LIMIT 1");
+    $user = $result ? mysqli_fetch_assoc($result) : [];
+    if (!$user) {
+        return false;
+    }
+
+    $username = trim((string) ($user['username_normalized'] ?: $user['username'] ?: ''));
+    $name = trim((string) ($user['full_name'] ?? ''));
+    if ($name === '' || str_starts_with($name, 'User ') || $username === '') {
+        return false;
+    }
+
+    if (empty($user['username_normalized'])) {
+        $safeUsername = mysqli_real_escape_string($conn, strtolower($username));
+        mysqli_query($conn, "UPDATE users SET username_normalized='$safeUsername' WHERE id=$userId");
+    }
+
+    if (empty($user['profile_completed']) || empty($user['onboarding_completed'])) {
+        mysqli_query($conn, "UPDATE users SET profile_completed=1, onboarding_completed=1, onboarding_step='complete' WHERE id=$userId");
+        mysqli_query($conn, "INSERT IGNORE INTO user_profiles (user_id) VALUES ($userId)");
+        mysqli_query($conn, "UPDATE user_profiles SET setup_completed_at=COALESCE(setup_completed_at, NOW()) WHERE user_id=$userId");
+    }
+
+    return true;
+}
+
 function chatweb_backend_config($conn, $settingKey, $envKey, $default = '')
 {
     $value = chatweb_app_setting($conn, $settingKey, '');
@@ -322,6 +364,28 @@ function chatweb_validate_username($conn, $username, $currentUserId = 0)
         'normalized' => $normalized,
         'message' => $taken ? 'Username already taken.' : 'Username available.',
     ];
+}
+
+function chatweb_available_username($conn, $preferred, $currentUserId = 0)
+{
+    $base = preg_replace('/[^a-z0-9_.]/', '', chatweb_normalize_username($preferred));
+    $base = trim($base, '._');
+    $base = preg_replace('/[._]{2,}/', '_', $base);
+    if ($base === '' || strlen($base) < 3) {
+        $base = 'user' . (int) $currentUserId;
+    }
+    $base = substr($base, 0, 24);
+
+    for ($attempt = 0; $attempt < 20; $attempt++) {
+        $suffix = $attempt === 0 ? '' : (string) random_int(10, 9999);
+        $candidate = substr($base, 0, 24 - strlen($suffix)) . $suffix;
+        $validation = chatweb_validate_username($conn, $candidate, $currentUserId);
+        if ($validation['available']) {
+            return $validation['normalized'];
+        }
+    }
+
+    return substr('user' . (int) $currentUserId . bin2hex(random_bytes(3)), 0, 24);
 }
 
 function chatweb_rate_limit($conn, $action, $key, $limit, $windowSeconds, $blockSeconds)
