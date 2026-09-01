@@ -17,6 +17,8 @@ export async function setToken(token) {
 
 async function request(path, options = {}) {
   const token = await getToken();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs || 10000);
   const headers = {
     Accept: 'application/json',
     ...(options.headers || {}),
@@ -29,18 +31,27 @@ async function request(path, options = {}) {
     options.body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error || data.message || 'Request failed');
+  try {
+    const response = await fetch(`${API_BASE}${path}`, { ...options, headers, signal: controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.error || data.message || 'Request failed');
+    }
+    return data;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('Server took too long to respond.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return data;
 }
 
 export const api = {
   startAuth: (payload) => request('/start.php', { method: 'POST', body: payload }),
   verifyAuth: (payload) => request('/verify.php', { method: 'POST', body: payload }),
-  me: () => request('/me.php'),
+  me: () => request('/me.php', { timeoutMs: 5000 }),
   checkUsername: (username) => request(`/check_username.php?username=${encodeURIComponent(username)}`),
   setupProfile: (payload) => {
     const form = new FormData();
@@ -61,4 +72,3 @@ export const api = {
   users: (q) => request(`/users.php?q=${encodeURIComponent(q)}`),
   startChat: (userId) => request('/start_chat.php', { method: 'POST', body: { user_id: userId } }),
 };
-

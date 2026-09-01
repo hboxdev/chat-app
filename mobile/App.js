@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { api, setToken } from './src/api/client';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -29,7 +29,12 @@ export default function App() {
   }, []);
 
   if (booting) {
-    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator /></View>;
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eef2f7', padding: 24 }}>
+        <ActivityIndicator color="#2563eb" />
+        <Text style={{ color: '#64748b', marginTop: 14 }}>Opening Chat Web...</Text>
+      </View>
+    );
   }
 
   return (
@@ -47,4 +52,3 @@ export default function App() {
     </>
   );
 }
-
