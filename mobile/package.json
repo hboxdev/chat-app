@@ -1,0 +1,21 @@
+{
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "latest",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "latest",
+    "expo-image-picker": "latest",
+    "expo-status-bar": "latest",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "devDependencies": {
+    "@babel/core": "latest"
+  },
+  "private": true
+}

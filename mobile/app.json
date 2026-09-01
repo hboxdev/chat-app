@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Chat Web",
+    "slug": "chat-web",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "chatweb",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2563eb"
+      }
+    },
+    "plugins": ["expo-image-picker"]
+  }
+}
+
