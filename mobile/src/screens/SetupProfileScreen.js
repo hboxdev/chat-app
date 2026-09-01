@@ -38,6 +38,7 @@ export function SetupProfileScreen({ user, onDone }) {
       quality: 0.85,
       allowsEditing: true,
       aspect: [1, 1],
+      legacy: true,
     });
     if (!result.canceled) {
       setPhoto(result.assets[0]);
