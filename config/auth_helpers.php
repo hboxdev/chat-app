@@ -618,7 +618,11 @@ function chatweb_send_email_otp($email, $code)
     $subject = 'Your Chat Web verification code';
     $ttlMinutes = isset($GLOBALS['conn']) ? chatweb_app_setting_int($GLOBALS['conn'], 'otp_ttl_minutes', CHATWEB_OTP_TTL_MINUTES, 1, 60) : CHATWEB_OTP_TTL_MINUTES;
     $body = "Your verification code is: $code\n\nThis code expires in " . $ttlMinutes . " minutes.";
-    $from = isset($GLOBALS['conn']) ? chatweb_backend_config($GLOBALS['conn'], 'smtp_from', 'SMTP_FROM', getenv('MAIL_FROM') ?: 'no-reply@chatweb.local') : (getenv('SMTP_FROM') ?: (getenv('MAIL_FROM') ?: 'no-reply@chatweb.local'));
+    $defaultFrom = chatweb_default_mail_from();
+    $from = isset($GLOBALS['conn']) ? chatweb_backend_config($GLOBALS['conn'], 'smtp_from', 'SMTP_FROM', getenv('MAIL_FROM') ?: $defaultFrom) : (getenv('SMTP_FROM') ?: (getenv('MAIL_FROM') ?: $defaultFrom));
+    if (!filter_var($from, FILTER_VALIDATE_EMAIL)) {
+        $from = $defaultFrom;
+    }
     $fromName = isset($GLOBALS['conn']) ? chatweb_backend_config($GLOBALS['conn'], 'email_from_name', 'SMTP_FROM_NAME', 'Chat Web') : (getenv('SMTP_FROM_NAME') ?: 'Chat Web');
 
     $hasSmtp = isset($GLOBALS['conn'])
@@ -628,9 +632,32 @@ function chatweb_send_email_otp($email, $code)
         return chatweb_send_smtp_mail($email, $subject, $body, $from, $fromName);
     }
 
-    $headers = "From: $from\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+    $safeFromName = str_replace(['"', "\r", "\n"], '', $fromName);
+    $headers = [
+        'From: "' . $safeFromName . '" <' . $from . '>',
+        'Reply-To: ' . $from,
+        'Return-Path: ' . $from,
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+    ];
+    $params = '-f' . escapeshellarg($from);
+    $sent = @mail($email, $subject, $body, implode("\r\n", $headers), $params);
+    if (!$sent) {
+        error_log("PHP mail OTP failed for $email using from $from.");
+    }
 
-    return @mail($email, $subject, $body, $headers);
+    return $sent;
+}
+
+function chatweb_default_mail_from()
+{
+    $host = strtolower($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost');
+    $host = preg_replace('/:\d+$/', '', $host);
+    $host = preg_replace('/^www\./', '', $host);
+    if (!preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/', $host)) {
+        $host = 'localhost.localdomain';
+    }
+    return 'no-reply@' . $host;
 }
 
 function chatweb_smtp_read($socket)
