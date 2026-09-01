@@ -27,6 +27,12 @@ export function SetupProfileScreen({ user, onDone }) {
   }, [username]);
 
   async function pickPhoto() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow gallery access to choose a profile photo.');
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.85,
@@ -91,4 +97,3 @@ const styles = StyleSheet.create({
   button: { alignItems: 'center', backgroundColor: '#2563eb', borderRadius: 8, justifyContent: 'center', minHeight: 52, marginTop: 8 },
   buttonText: { color: '#fff', fontWeight: '900' },
 });
-
