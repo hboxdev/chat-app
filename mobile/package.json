@@ -1,8 +1,8 @@
 {
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web"
   },
   "dependencies": {
@@ -17,5 +17,7 @@
     "@babel/core": "latest",
     "babel-preset-expo": "~54.0.10"
   },
-  "private": true
+  "private": true,
+  "name": "mobile",
+  "version": "1.0.0"
 }

@@ -6,6 +6,8 @@ config/test-*.php
 mobile/node_modules/
 mobile/.expo/
 mobile/dist-test*/
+mobile/android/
+mobile/*.apk
 
 # Runtime uploads should be copied/backed up separately from code deploys.
 uploads/*
