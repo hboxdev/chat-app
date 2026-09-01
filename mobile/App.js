@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View } fr
 import { StatusBar } from 'expo-status-bar';
 import { WebView } from 'react-native-webview';
 
-const CHAT_WEB_URL = 'https://skyblue-goshawk-811042.hostingersite.com/';
+const CHAT_WEB_URL = 'https://skyblue-goshawk-811042.hostingersite.com/?mobile_app=1&v=20260901';
 
 export default function App() {
   const webViewRef = useRef(null);
@@ -24,6 +24,8 @@ export default function App() {
         source={{ uri: CHAT_WEB_URL }}
         style={styles.webview}
         startInLoadingState
+        cacheEnabled={false}
+        cacheMode="LOAD_NO_CACHE"
         javaScriptEnabled
         domStorageEnabled
         sharedCookiesEnabled
@@ -121,4 +123,3 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 });
-
